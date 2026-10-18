@@ -3,8 +3,8 @@ name = "arvio"
 version = "0.1.0"
 description = "Label eval items by hand, one at a time, with the judge hidden until the session ends"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND OFL-1.1"
+license-files = ["LICENSE", "src/arvio/static/fonts/OFL.txt"]
 requires-python = ">=3.11"
 authors = [{ name = "Jonathan Boho" }]
 dependencies = []

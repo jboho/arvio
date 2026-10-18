@@ -15,6 +15,7 @@ import re
 import statistics
 import tomllib
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
@@ -166,8 +167,12 @@ class Task:
     items: list[Item]
     labels: Labels
 
+    @cached_property
+    def _by_id(self) -> dict[str, Item]:
+        return {i.id: i for i in self.items}
+
     def item(self, item_id: str) -> Item | None:
-        return next((i for i in self.items if i.id == item_id), None)
+        return self._by_id.get(item_id)
 
     def waiting(self) -> list[Item]:
         return [i for i in self.items if i.id not in self.labels.current]
@@ -191,6 +196,7 @@ class Task:
             "labeled": len(self.labels.current),
             "revealed": len(self.labels.revealed),
             "older": len(self.labels.older),
+            "has_judge": self.card.agreement is not None,
             "last_at": self.labels.last_at,
             "next_n": next_n,
             "next_minutes": max(minutes, 1) if next_n else 0,
@@ -594,8 +600,13 @@ def card_version(question: str, choices, followups, pin: str) -> str:
     )
 
 
-def check_answer(card: Card, answer: Any, followups: Any) -> list[str]:
-    """Problems with one label's answer and follow-ups under this card."""
+def check_answer(
+    card: Card, answer: Any, followups: Any, prefill: dict | None = None
+) -> list[str]:
+    """Problems with one label's answer and follow-ups under this card.
+
+    Given the item's prefill, a required edit must also change a field.
+    """
     if card.choice(answer) is None:
         return [f"answer '{answer}' is not a choice"]
     if not isinstance(followups, dict):
@@ -610,9 +621,18 @@ def check_answer(card: Card, answer: Any, followups: Any) -> list[str]:
         elif (err := _followup_value_error(f, value)) is not None:
             errs.append(f"followups {key}: {err}")
     for f in card.followups:
-        if f.required and answer in f.when and _blank(followups.get(f.key)):
+        if not f.required or answer not in f.when:
+            continue
+        value = followups.get(f.key)
+        if _blank(value):
             errs.append(f"followups: '{f.key}' is required for '{answer}'")
+        elif f.kind == "edit" and prefill is not None and _unchanged(f, value, prefill):
+            errs.append(f"followups: '{f.key}' must change at least one field")
     return errs
+
+
+def _unchanged(f: Followup, value: dict, prefill: dict) -> bool:
+    return all((value.get(x.key) or "") == (prefill.get(x.key) or "") for x in f.fields)
 
 
 def _blank(value: Any) -> bool:
@@ -665,6 +685,18 @@ def _no_constant(name: str) -> Any:
     raise ValueError(f"{name} is not valid JSON")
 
 
+def strict_loads(text: str | bytes) -> Any:
+    """json.loads that refuses duplicate keys, NaN, Infinity and lone surrogates.
+
+    Raises ValueError (which covers JSONDecodeError and the Unicode errors) or
+    RecursionError.
+    """
+    value = json.loads(text, object_pairs_hook=_object, parse_constant=_no_constant)
+    # A lone surrogate parses but can't be written back as UTF-8.
+    json.dumps(value, ensure_ascii=False).encode()
+    return value
+
+
 def read_jsonl(
     file: Path, problems: list[Problem], torn_tail_ok: bool = False
 ) -> list[tuple[int, Any]] | None:
@@ -686,11 +718,7 @@ def read_jsonl(
         if not line.strip():
             continue
         try:
-            value = json.loads(
-                line, object_pairs_hook=_object, parse_constant=_no_constant
-            )
-            # A lone surrogate parses but can't be written back as UTF-8.
-            json.dumps(value, ensure_ascii=False).encode()
+            value = strict_loads(line)
         except json.JSONDecodeError as e:
             message = f"not valid JSON: {e.msg} (column {e.colno})"
         except UnicodeEncodeError:

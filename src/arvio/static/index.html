@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>arvio</title>
+<link rel="icon" href="data:,">
+<style nonce="{{nonce}}">
+@font-face { font-family: "Space Grotesk Variable"; src: url(/fonts/space-grotesk.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url(/fonts/plex-mono-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url(/fonts/plex-mono-500.woff2) format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url(/fonts/plex-mono-600.woff2) format("woff2"); font-weight: 600; font-display: swap; }
+
+:root {
+  color-scheme: light;
+  --k-bg: #f1f1ef;
+  --k-stage: #e8e8e5;
+  --k-panel: #ffffff;
+  --k-panel-head: #f7f7f5;
+  --k-raised: #efefec;
+  --k-hair: rgba(24, 24, 27, 0.11);
+  --k-hair-soft: rgba(24, 24, 27, 0.06);
+  --k-hi: #18181b;
+  --k-mid: #52525b;
+  --k-lo: #6b6b75;
+  --k-accent: #4f46e5;
+  --k-accent-dim: rgba(79, 70, 229, 0.1);
+  --k-on-accent: #ffffff;
+  --k-go: #047857;
+  --k-go-dim: rgba(4, 120, 87, 0.1);
+  --k-crit: #be123c;
+  --k-crit-dim: rgba(190, 18, 60, 0.08);
+  --k-warn: #92400e;
+  --k-warn-dim: rgba(217, 119, 6, 0.16);
+  --k-sky: #0369a1;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --k-bg: #0c0c0f;
+  --k-stage: #08080a;
+  --k-panel: #131317;
+  --k-panel-head: #17171c;
+  --k-raised: #1e1e24;
+  --k-hair: rgba(255, 255, 255, 0.08);
+  --k-hair-soft: rgba(255, 255, 255, 0.045);
+  --k-hi: #f2f2f4;
+  --k-mid: #a5a5ae;
+  --k-lo: #8b8b95;
+  --k-accent: #8b8cf9;
+  --k-accent-dim: rgba(139, 140, 249, 0.14);
+  --k-on-accent: #0c0c14;
+  --k-go: #34d399;
+  --k-go-dim: rgba(52, 211, 153, 0.12);
+  --k-crit: #fb7185;
+  --k-crit-dim: rgba(251, 113, 133, 0.1);
+  --k-warn: #fbbf24;
+  --k-warn-dim: rgba(251, 191, 36, 0.16);
+  --k-sky: #38bdf8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --k-bg: #0c0c0f;
+    --k-stage: #08080a;
+    --k-panel: #131317;
+    --k-panel-head: #17171c;
+    --k-raised: #1e1e24;
+    --k-hair: rgba(255, 255, 255, 0.08);
+    --k-hair-soft: rgba(255, 255, 255, 0.045);
+    --k-hi: #f2f2f4;
+    --k-mid: #a5a5ae;
+    --k-lo: #8b8b95;
+    --k-accent: #8b8cf9;
+    --k-accent-dim: rgba(139, 140, 249, 0.14);
+    --k-on-accent: #0c0c14;
+    --k-go: #34d399;
+    --k-go-dim: rgba(52, 211, 153, 0.12);
+    --k-crit: #fb7185;
+    --k-crit-dim: rgba(251, 113, 133, 0.1);
+    --k-warn: #fbbf24;
+    --k-warn-dim: rgba(251, 191, 36, 0.16);
+    --k-sky: #38bdf8;
+  }
+}
+
+:root {
+  --font-display: "Space Grotesk Variable", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --t-micro: 9px;
+  --t-mini: 11px;
+  --t-caption: 12px;
+  --t-body: 13px;
+  --t-heading: 14px;
+  --t-subhead: 16px;
+  --t-display: 19px;
+  --bar-h: 44px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--k-stage);
+  color: var(--k-mid);
+  font-family: var(--font-display);
+  font-size: var(--t-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--k-accent); outline-offset: 2px; }
+#app:focus { outline: none; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.bar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 10px;
+  height: var(--bar-h); padding: 0 16px;
+  background: var(--k-panel-head); border-bottom: 1px solid var(--k-hair);
+}
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: var(--t-mini); font-weight: 600; letter-spacing: 0.2em; color: var(--k-hi); }
+.brand i { width: 9px; height: 9px; border-radius: 2px; background: var(--k-accent); }
+.crumb { font-family: var(--font-mono); font-size: var(--t-mini); text-transform: uppercase; letter-spacing: 0.12em; color: var(--k-lo); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grow { flex: 1; }
+.progress { font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-mid); white-space: nowrap; }
+
+main { max-width: 1240px; margin: 0 auto; padding: 18px 16px 48px; }
+h1 { margin: 0; font-size: var(--t-display); font-weight: 600; color: var(--k-hi); letter-spacing: -0.01em; }
+h2 { margin: 0; font-size: var(--t-heading); font-weight: 600; color: var(--k-hi); }
+p { margin: 0; }
+.intro { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.sub { color: var(--k-mid); }
+.lo { color: var(--k-lo); }
+.stack { display: grid; gap: 12px; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+
+.panel { display: flex; flex-direction: column; min-width: 0; background: var(--k-panel); border: 1px solid var(--k-hair); border-radius: 10px; overflow: hidden; }
+.panel-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--k-panel-head); border-bottom: 1px solid var(--k-hair); }
+details.panel:not([open]) > .panel-head { border-bottom: 0; }
+summary.panel-head { cursor: pointer; list-style: none; }
+summary.panel-head::-webkit-details-marker { display: none; }
+.dots { color: var(--k-lo); letter-spacing: -2px; line-height: 1; user-select: none; }
+.chev { color: var(--k-lo); transition: transform 0.12s; }
+details[open] > summary .chev { transform: rotate(90deg); }
+.ptitle { font-family: var(--font-mono); font-size: var(--t-mini); text-transform: uppercase; letter-spacing: 0.15em; color: var(--k-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill { padding: 0 6px; border: 1px solid var(--k-hair); border-radius: 999px; background: var(--k-raised); font-family: var(--font-mono); font-size: var(--t-micro); font-weight: 600; line-height: 16px; color: var(--k-hi); }
+.pill.accent { background: var(--k-accent-dim); color: var(--k-accent); border-color: transparent; }
+.panel-head .right { margin-left: auto; font-family: var(--font-mono); font-size: var(--t-micro); color: var(--k-lo); text-transform: uppercase; letter-spacing: 0.1em; }
+.panel-body { padding: 12px 14px; display: grid; gap: 10px; }
+
+.facts { font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-lo); }
+.note-line { font-size: var(--t-caption); color: var(--k-warn); }
+.problem { font-size: var(--t-caption); color: var(--k-crit); }
+
+kbd {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+  border: 1px solid var(--k-hair); border-bottom-width: 2px; border-radius: 5px;
+  background: var(--k-raised); color: var(--k-hi);
+  font-family: var(--font-mono); font-size: var(--t-mini); font-weight: 600; line-height: 1;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px;
+  border: 1px solid var(--k-hair); border-radius: 7px; background: var(--k-raised); color: var(--k-hi);
+  font-family: var(--font-mono); font-size: var(--t-mini); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) { border-color: var(--k-lo); }
+.btn.primary { background: var(--k-accent); border-color: var(--k-accent); color: var(--k-on-accent); }
+.btn.primary kbd { background: transparent; color: inherit; border-color: currentColor; opacity: 0.8; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.small { padding: 3px 8px; }
+.ctrl { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--k-lo); cursor: pointer; }
+.ctrl:hover { background: var(--k-raised); color: var(--k-hi); }
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.actions .grow { flex: 1; }
+.dock { position: sticky; bottom: 0; z-index: 3; display: grid; gap: 8px; padding: 10px 0 14px; background: var(--k-stage); border-top: 1px solid var(--k-hair); }
+.dock .hint { color: var(--k-mid); }
+
+/* The task card */
+.question { font-size: var(--t-display); font-weight: 600; color: var(--k-hi); line-height: 1.35; }
+.rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--k-hi); }
+.choice-ref { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; padding: 8px 0; border-top: 1px solid var(--k-hair-soft); }
+.choice-ref:first-child { border-top: 0; padding-top: 0; }
+.choice-ref b { color: var(--k-hi); font-weight: 600; }
+.example { grid-column: 2; font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-mid); }
+
+/* The item screen */
+.work { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 14px; align-items: start; }
+/* The question and the buttons stay put; only the answer panel's body scrolls.
+   The height leaves room for main's 48px bottom padding: a taller column would
+   ride up under the bar when the page is scrolled to its end. */
+.side { position: sticky; top: calc(var(--bar-h) + 12px); display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - var(--bar-h) - 12px - 48px); }
+.side .qpanel { flex: none; }
+.answer { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.answer > .panel { min-height: 0; }
+.answer > .panel > .panel-body { min-height: 0; overflow-y: auto; }
+.answer > .dock { flex: none; }
+.content { display: grid; gap: 12px; min-width: 0; }
+.qpanel .question { font-size: var(--t-subhead); }
+.text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--k-hi); font-size: var(--t-body); line-height: 1.6; }
+.text.mono { font-family: var(--font-mono); font-size: var(--t-caption); }
+mark { background: var(--k-warn-dim); color: var(--k-hi); box-shadow: inset 0 -2px 0 var(--k-warn); border-radius: 2px; padding: 0 1px; }
+pre.diff { margin: 0; font-family: var(--font-mono); font-size: var(--t-caption); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--k-mid); }
+pre.diff .add { color: var(--k-go); background: var(--k-go-dim); }
+pre.diff .del { color: var(--k-crit); background: var(--k-crit-dim); }
+pre.diff .hunk { color: var(--k-sky); }
+pre.diff .file { color: var(--k-hi); font-weight: 600; }
+dl.fields { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; }
+dl.fields dt { font-family: var(--font-mono); font-size: var(--t-mini); text-transform: uppercase; letter-spacing: 0.08em; color: var(--k-lo); padding-top: 2px; }
+dl.fields dd { margin: 0; color: var(--k-hi); overflow-wrap: anywhere; white-space: pre-wrap; }
+
+.choices { display: grid; gap: 6px; }
+.choice {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: start; width: 100%;
+  padding: 8px 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--k-hair); border-radius: 8px; background: var(--k-panel);
+}
+.choice:hover { background: var(--k-raised); }
+.choice[aria-pressed="true"] { border-color: var(--k-accent); background: var(--k-accent-dim); box-shadow: inset 0 0 0 1px var(--k-accent); }
+.choice[aria-pressed="true"] kbd { background: var(--k-accent); color: var(--k-on-accent); border-color: var(--k-accent); }
+.choice .name { color: var(--k-hi); font-weight: 600; }
+.choice .meaning { grid-column: 2; font-size: var(--t-caption); color: var(--k-mid); }
+.choice.compact { padding: 6px 9px; }
+.followup { display: grid; gap: 6px; padding-top: 10px; border-top: 1px dashed var(--k-hair); }
+.prompt { color: var(--k-hi); font-weight: 600; font-size: var(--t-caption); }
+.req { font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: 0.1em; text-transform: uppercase; color: var(--k-warn); margin-left: 6px; }
+label.field { display: grid; gap: 3px; font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-lo); text-transform: uppercase; letter-spacing: 0.08em; }
+textarea, input[type="text"] {
+  width: 100%; padding: 7px 9px; border: 1px solid var(--k-hair); border-radius: 7px;
+  background: var(--k-bg); color: var(--k-hi); font-size: var(--t-body); text-transform: none; letter-spacing: 0;
+  font-family: var(--font-display); resize: vertical;
+}
+textarea[data-fit] { max-height: 50vh; }
+textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--k-accent); box-shadow: 0 0 0 2px var(--k-accent-dim); }
+.hint { font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-lo); }
+.hint.warn, .wanted > .prompt { color: var(--k-warn); }
+.keys { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-lo); }
+.keys span { display: inline-flex; align-items: center; gap: 4px; }
+.error { padding: 8px 10px; border-radius: 7px; background: var(--k-crit-dim); color: var(--k-crit); font-size: var(--t-caption); }
+.error ul { margin: 4px 0 0; padding-left: 16px; }
+
+/* Results */
+.score { font-size: var(--t-display); font-weight: 600; color: var(--k-hi); }
+.versus { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.versus h3 { margin: 0 0 4px; font-family: var(--font-mono); font-size: var(--t-mini); font-weight: 600; letter-spacing: 0.15em; color: var(--k-lo); }
+.mark-bad { color: var(--k-crit); }
+.mark-good { color: var(--k-go); }
+.row { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--k-hair-soft); }
+.row:first-child { border-top: 0; }
+.row .id { font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-lo); }
+
+@media (max-width: 860px) {
+  .work { grid-template-columns: 1fr; }
+  .side { position: static; max-height: none; }
+  .versus { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header class="bar">
+  <span class="brand"><i></i>ARVIO</span>
+  <span class="crumb" id="crumb"></span>
+  <span class="grow"></span>
+  <span class="progress" id="progress"></span>
+  <button class="ctrl" id="theme" type="button" aria-label="Switch between light and dark" title="Light or dark">◐</button>
+</header>
+<main id="app" tabindex="-1"></main>
+<script nonce="{{nonce}}">
+"use strict";
+
+const $app = document.getElementById("app");
+const $crumb = document.getElementById("crumb");
+const $progress = document.getElementById("progress");
+const root = document.documentElement;
+const PACE_WINDOW = 20;
+const PACE_MIN = 3;
+
+// The key arrives in the link's #fragment, so it never reaches a server log.
+// It is kept for this tab only, so a reload still works.
+const TOKEN = (() => {
+  const m = location.hash.match(/(?:^#|&)t=([A-Za-z0-9_-]+)/);
+  if (m) {
+    try { sessionStorage.setItem("arvio-token", m[1]); } catch {}
+    history.replaceState(null, "", "/");
+    return m[1];
+  }
+  try { return sessionStorage.getItem("arvio-token"); } catch { return null; }
+})();
+
+try {
+  const saved = localStorage.getItem("arvio-theme");
+  if (saved === "light" || saved === "dark") root.dataset.theme = saved;
+} catch {}
+document.getElementById("theme").addEventListener("click", () => {
+  const dark = root.dataset.theme
+    ? root.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("arvio-theme", root.dataset.theme); } catch {}
+});
+
+// Builds elements from text only. Item text is untrusted, so nothing here
+// ever goes through innerHTML.
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else el.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    el.append(kid instanceof Node ? kid : String(kid));
+  }
+  return el;
+}
+
+function kbd(key) { return h("kbd", {}, key === "Enter" ? "⏎" : key === "ArrowLeft" ? "←" : key.toUpperCase()); }
+
+function panel({ title, count, right, cls, accentCount }, ...body) {
+  return h("section", { class: "panel " + (cls || "") },
+    h("header", { class: "panel-head" },
+      h("span", { class: "dots", "aria-hidden": "true" }, "⋮⋮"),
+      h("span", { class: "ptitle" }, title),
+      count != null && h("span", { class: "pill" + (accentCount ? " accent" : "") }, count),
+      right && h("span", { class: "right" }, right)),
+    h("div", { class: "panel-body" }, body));
+}
+
+function foldPanel({ title, right, open }, ...body) {
+  return h("details", { class: "panel", open: !!open },
+    h("summary", { class: "panel-head" },
+      h("span", { class: "chev", "aria-hidden": "true" }, "›"),
+      h("span", { class: "ptitle" }, title),
+      right && h("span", { class: "right" }, right)),
+    h("div", { class: "panel-body" }, body));
+}
+
+function button(text, onclick, opts = {}) {
+  return h("button", { type: "button", class: "btn" + (opts.primary ? " primary" : "") + (opts.small ? " small" : ""), onclick, disabled: !!opts.disabled },
+    opts.key && kbd(opts.key), text);
+}
+
+function plural(n, one, many) { return `${n} ${n === 1 ? one : many || one + "s"}`; }
+
+class ApiError extends Error {
+  constructor(status, message, problems) { super(message); this.status = status; this.problems = problems || []; }
+}
+
+async function api(method, path, body) {
+  let res;
+  try {
+    const post = method === "POST";
+    res = await fetch("/api" + path, {
+      method,
+      headers: post ? { "X-Arvio-Token": TOKEN || "", "Content-Type": "application/json" } : { "X-Arvio-Token": TOKEN || "" },
+      body: post ? JSON.stringify(body || {}) : undefined,
+    });
+  } catch {
+    throw new ApiError(0, "arvio isn't answering. Start it again in your terminal with: arvio");
+  }
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) {
+    const message = res.status === 403
+      ? "This page's key doesn't match the running arvio. Open the link arvio printed in your terminal."
+      : (data && data.error) || `arvio answered ${res.status}`;
+    throw new ApiError(res.status, message, data && data.problems);
+  }
+  return data;
+}
+
+function errorBox(err) {
+  return h("div", { class: "error", role: "alert" }, err.message,
+    err.problems && err.problems.length ? h("ul", {}, err.problems.map((p) => h("li", {}, p))) : null);
+}
+
+function fatal(err) {
+  screen = "error";
+  $progress.textContent = "";
+  $app.replaceChildren(h("div", { class: "stack" },
+    errorBox(err),
+    h("div", { class: "actions" }, button("Back to inbox", showInbox, { key: "Enter" }))));
+}
+
+// ---------- state ----------
+
+let screen = "loading";
+let inbox = [];
+let S = null; // the session in progress
+
+// Time counts only while the page is visible.
+const clock = { spent: 0, since: null };
+function clockStart() { clock.spent = 0; clock.since = document.hidden ? null : performance.now(); }
+function clockRead() { return (clock.spent + (clock.since != null ? performance.now() - clock.since : 0)) / 1000; }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && clock.since != null) { clock.spent += performance.now() - clock.since; clock.since = null; }
+  else if (!document.hidden && screen === "item") clock.since = performance.now();
+});
+
+function pace() {
+  const xs = [...S.recent, ...S.times].slice(-PACE_WINDOW);
+  if (xs.length < PACE_MIN) return S.perItem;
+  const s = xs.slice().sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+function minutesLeft(n) { return n ? Math.max(1, Math.ceil((n * pace()) / 60)) : 0; }
+
+// ---------- inbox ----------
+
+async function showInbox() {
+  screen = "loading";
+  S = null;
+  $crumb.textContent = "";
+  $progress.textContent = "";
+  if (!TOKEN) {
+    fatal(new ApiError(403, "Open arvio from the link the arvio command printed in your terminal."));
+    return;
+  }
+  let data;
+  try { data = await api("GET", "/inbox"); } catch (err) { fatal(err); return; }
+  inbox = data.tasks;
+  screen = "inbox";
+  const waiting = inbox.reduce((n, t) => n + (t.waiting || 0), 0);
+  $app.replaceChildren(
+    h("div", { class: "intro" }, h("h1", {}, "Inbox"),
+      h("p", { class: "sub" }, `${plural(waiting, "item")} waiting in ${plural(inbox.length, "task")}`)),
+    inbox.length
+      ? h("div", { class: "grid" }, inbox.map(taskPanel))
+      : h("p", { class: "sub" }, "No tasks. Add one in your terminal with: arvio add DIR"));
+  $app.focus({ preventScroll: true });
+}
+
+function startable(t) { return !t.problem && (t.waiting > 0 || t.labeled > t.revealed); }
+
+function taskPanel(t, n) {
+  if (t.problem) {
+    return panel({ title: t.name },
+      h("p", { class: "problem" }, t.problem),
+      h("p", { class: "facts" }, t.dir));
+  }
+  const unrevealed = t.labeled - t.revealed;
+  const facts = [plural(t.items, "item"), `${t.labeled} labeled`];
+  if (t.last_at) facts.push(`last ${t.last_at.slice(0, 10)}`);
+  const key = n < 9 ? String(n + 1) : null;
+  return panel({ title: t.name, count: t.waiting, accentCount: t.waiting > 0, right: key && startable(t) && `key ${key}` },
+    h("h2", {}, t.title),
+    t.purpose && h("p", { class: "sub" }, t.purpose),
+    h("p", { class: "facts" }, facts.join(" · ")),
+    t.older > 0 && h("p", { class: "note-line" }, `${plural(t.older, "item")} labeled only under an older card. Those labels are kept but not used.`),
+    unrevealed > 0 && h("p", { class: "note-line" }, t.has_judge
+      ? `${plural(unrevealed, "label")} not compared with the judge yet. Finish a session to see them.`
+      : `${plural(unrevealed, "label")} not locked yet. Finish a session to lock them.`),
+    h("div", { class: "actions" },
+      t.waiting > 0
+        ? h("span", { class: "hint" }, `Next: ${plural(t.next_n, "item")}, about ${t.next_minutes} min`)
+        : h("span", { class: "hint" }, "All labeled"),
+      h("span", { class: "grow" }),
+      startable(t) && button(t.waiting > 0 ? "Start" : "Finish", () => showCard(t.id), { primary: true })));
+}
+
+// ---------- the card ----------
+
+async function showCard(tid) {
+  let data;
+  try { data = await api("GET", `/tasks/${encodeURIComponent(tid)}`); } catch (err) { fatal(err); return; }
+  const { card, summary } = data;
+  screen = "card";
+  S = { tid, card, summary };
+  $crumb.textContent = card.title;
+  $progress.textContent = "";
+  const choiceName = (key) => (card.choices.find((c) => c.key === key) || { label: key }).label;
+  const first = summary.waiting
+    ? `You'll label ${plural(summary.next_n, "item")}, about ${summary.next_minutes} min.` + (card.has_judge ? " The judge's answers stay hidden until you finish." : "")
+    : card.has_judge ? "Nothing is waiting. Finish to compare your earlier labels with the judge." : "Nothing is waiting. Finish to lock your earlier labels.";
+  $app.replaceChildren(h("div", { class: "stack" },
+    panel({ title: "The question" },
+      h("p", { class: "question" }, card.question),
+      card.purpose && h("p", { class: "sub" }, card.purpose)),
+    card.rules.length > 0 && panel({ title: "Rules", count: card.rules.length },
+      h("ol", { class: "rules" }, card.rules.map((r) => h("li", {}, r)))),
+    panel({ title: "Your choices", count: card.choices.length },
+      h("div", {}, card.choices.map((c) => h("div", { class: "choice-ref" },
+        kbd(c.hotkey), h("span", {}, h("b", {}, c.label), " ", c.meaning),
+        c.example && h("span", { class: "example" }, "Example: " + c.example))))),
+    card.followups.length > 0 && panel({ title: "Follow-up questions", count: card.followups.length },
+      h("div", {}, card.followups.map((f) => h("div", { class: "choice-ref" },
+        h("span", { class: "pill" }, f.kind),
+        h("span", {}, h("b", {}, f.prompt), f.required && h("span", { class: "req" }, "required")),
+        h("span", { class: "example" }, "After: " + f.when.map(choiceName).join(", ") +
+          (f.options.length ? " · " + f.options.map((o) => `${o.hotkey.toUpperCase()} ${o.label}`).join(" · ") : "")))))),
+    panel({ title: "Keys" },
+      h("div", { class: "keys" },
+        h("span", {}, kbd("Enter"), "save and go on"),
+        h("span", {}, kbd("ArrowLeft"), "back one item to change it"),
+        h("span", {}, kbd("n"), "add a note"),
+        h("span", {}, kbd("Esc"), "leave a text box")),
+      h("p", { class: "hint" }, "There is no skip. If the item doesn't give you enough to decide, choose Can't tell.")),
+    h("div", { class: "dock" },
+      h("p", { class: "sub" }, first),
+      h("div", { class: "actions" },
+        button("Back", showInbox, { key: "Esc" }),
+        h("span", { class: "grow" }),
+        button(summary.waiting ? "Start" : "Finish", startSession, { primary: true, key: "Enter" })))));
+  window.scrollTo(0, 0);
+  $app.focus({ preventScroll: true });
+}
+
+async function startSession() {
+  let data;
+  try { data = await api("POST", `/tasks/${encodeURIComponent(S.tid)}/sessions`); } catch (err) { fatal(err); return; }
+  S = {
+    tid: S.tid,
+    card: data.card,
+    session: data.session,
+    items: data.items,
+    i: 0,
+    answers: [],
+    sent: [],
+    times: [],
+    recent: data.recent_seconds,
+    perItem: data.seconds_per_item,
+    draft: null,
+    saving: false,
+    error: null,
+  };
+  if (S.items.length) showItem(); else showDone();
+}
+
+// ---------- an item ----------
+
+function blankDraft(item) {
+  const followups = {};
+  for (const f of S.card.followups) {
+    if (f.kind === "multi") followups[f.key] = [];
+    else if (f.kind === "edit") followups[f.key] = Object.fromEntries(f.fields.map((x) => [x.key, item.prefill[x.key] || ""]));
+    else followups[f.key] = "";
+  }
+  return { answer: null, followups, note: "", noteOpen: false };
+}
+
+function visibleFollowups() {
+  const a = S.draft.answer;
+  return a ? S.card.followups.filter((f) => f.when.includes(a)) : [];
+}
+
+function isBlank(f, v) {
+  if (f.kind === "multi") return !v || v.length === 0;
+  if (f.kind === "edit") return !v || Object.values(v).every((x) => !x.trim());
+  return !v || !String(v).trim();
+}
+
+function changedFields(f, v, prefill) {
+  return f.fields.filter((x) => (v[x.key] || "") !== ((prefill || {})[x.key] || ""));
+}
+
+// A required edit asks for a change, so its prefilled text alone doesn't count.
+function missing() {
+  const prefill = S.items[S.i].prefill;
+  return visibleFollowups().filter((f) => f.required &&
+    (isBlank(f, S.draft.followups[f.key]) || (f.kind === "edit" && !changedFields(f, S.draft.followups[f.key], prefill).length)));
+}
+
+function followupPayload(item) {
+  const out = {};
+  for (const f of visibleFollowups()) {
+    const v = S.draft.followups[f.key];
+    if (f.kind === "edit") {
+      if (f.required || changedFields(f, v, item.prefill).length) out[f.key] = { ...v };
+    } else if (!isBlank(f, v)) {
+      out[f.key] = f.kind === "text" ? v.trim() : f.kind === "multi" ? [...v] : v;
+    }
+  }
+  return out;
+}
+
+function renderBlock(block) {
+  const names = { text: "Text", diff: "Changes", fields: "Details" };
+  const title = block.title || names[block.kind];
+  let body;
+  if (block.kind === "text") body = textBody(block.text, block.highlight || [], block.mono);
+  else if (block.kind === "diff") body = diffBody(block.text);
+  else body = h("dl", { class: "fields" }, block.fields.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)]));
+  if (block.collapsed) return foldPanel({ title, right: "open" }, body);
+  return panel({ title }, body);
+}
+
+function textBody(text, highlights, mono) {
+  const el = h("div", { class: "text" + (mono ? " mono" : "") });
+  const spans = [];
+  for (const hl of highlights) {
+    if (!hl) continue;
+    for (let at = text.indexOf(hl); at !== -1; at = text.indexOf(hl, at + hl.length)) spans.push([at, at + hl.length]);
+  }
+  spans.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  let pos = 0;
+  for (const [start, end] of spans) {
+    if (start < pos) continue;
+    if (start > pos) el.append(text.slice(pos, start));
+    el.append(h("mark", {}, text.slice(start, end)));
+    pos = end;
+  }
+  el.append(text.slice(pos));
+  return el;
+}
+
+function diffBody(text) {
+  const pre = h("pre", { class: "diff" });
+  for (const line of text.split("\n")) {
+    const cls = line.startsWith("+++") || line.startsWith("---") ? "file"
+      : line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : line.startsWith("@@") ? "hunk" : null;
+    pre.append(h("span", { class: cls }, line + "\n"));
+  }
+  return pre;
+}
+
+function showItem() {
+  screen = "item";
+  const item = S.items[S.i];
+  const kept = S.answers[S.i];
+  S.draft = kept ? structuredClone(kept) : blankDraft(item);
+  S.error = null;
+  $crumb.textContent = S.card.title;
+  updateProgress();
+  S.$answer = h("div", { class: "answer" });
+  $app.replaceChildren(h("div", { class: "work" },
+    h("div", { class: "content" }, item.display.map(renderBlock),
+      h("p", { class: "hint" }, `Item ${item.id}`)),
+    h("aside", { class: "side" },
+      panel({ title: "Question", cls: "qpanel", count: `${S.i + 1}/${S.items.length}` },
+        h("p", { class: "question" }, S.card.question)),
+      S.$answer)));
+  renderAnswer();
+  window.scrollTo(0, 0);
+  document.activeElement && document.activeElement.blur && document.activeElement.blur();
+  clockStart();
+}
+
+function updateProgress() {
+  const left = S.items.length - S.i;
+  $progress.textContent = left > 0
+    ? `${S.i + 1} of ${S.items.length} · about ${minutesLeft(left)} min left`
+    : `${S.items.length} of ${S.items.length}`;
+}
+
+function choose(key) {
+  if (S.draft.answer === key) return;
+  S.draft.answer = key;
+  renderAnswer();
+  // A required written answer is the next thing to do, so start there.
+  const f = visibleFollowups().find((x) => x.kind === "text" && x.required && isBlank(x, S.draft.followups[x.key]));
+  const box = f && S.$answer.querySelector(`[data-followup="${f.key}"] textarea`);
+  if (box) box.focus();
+}
+
+// Grows an edit box to fit its text, so a prefilled answer shows whole.
+function fit(box) {
+  box.style.height = "auto";
+  box.style.height = `${box.scrollHeight + 2}px`;
+}
+
+function pick(f, key) {
+  const v = S.draft.followups;
+  if (f.kind === "multi") v[f.key] = v[f.key].includes(key) ? v[f.key].filter((k) => k !== key) : [...v[f.key], key];
+  else v[f.key] = v[f.key] === key ? "" : key;
+  renderAnswer();
+}
+
+function openNote() {
+  S.draft.noteOpen = true;
+  renderAnswer();
+  const note = S.$answer.querySelector("textarea[name=note]");
+  if (note) note.focus();
+}
+
+function renderAnswer() {
+  const d = S.draft;
+  const choiceButtons = S.card.choices.map((c) =>
+    h("button", { type: "button", class: "choice", "aria-pressed": String(d.answer === c.key), onclick: () => choose(c.key) },
+      kbd(c.hotkey), h("span", { class: "name" }, c.label), h("span", { class: "meaning" }, c.meaning)));
+  const followups = visibleFollowups().map((f) => {
+    const head = h("p", { class: "prompt" }, f.prompt, f.required && h("span", { class: "req" }, "required"));
+    const v = d.followups[f.key];
+    if (f.kind === "single" || f.kind === "multi") {
+      const on = (k) => (f.kind === "multi" ? v.includes(k) : v === k);
+      return h("div", { class: "followup", "data-followup": f.key }, head, h("div", { class: "choices" }, f.options.map((o) =>
+        h("button", { type: "button", class: "choice compact", "aria-pressed": String(on(o.key)), onclick: () => pick(f, o.key) },
+          kbd(o.hotkey), h("span", { class: "name" }, o.label), h("span", { class: "meaning" }, o.meaning)))));
+    }
+    if (f.kind === "text") {
+      const box = h("textarea", { rows: "2", "aria-label": f.prompt, oninput: (e) => { d.followups[f.key] = e.target.value; updateSave(); } });
+      box.value = v;
+      return h("div", { class: "followup", "data-followup": f.key }, head, box);
+    }
+    return h("div", { class: "followup", "data-followup": f.key }, head, f.fields.map((x) => {
+      const input = x.multiline
+        ? h("textarea", { rows: "3", "data-fit": true, oninput: (e) => { v[x.key] = e.target.value; fit(e.target); updateSave(); } })
+        : h("input", { type: "text", oninput: (e) => { v[x.key] = e.target.value; updateSave(); } });
+      input.value = v[x.key];
+      return h("label", { class: "field" }, x.label, input);
+    }));
+  });
+  let note;
+  if (d.noteOpen || d.note) {
+    note = h("textarea", { name: "note", rows: "2", placeholder: "Anything worth remembering about this item", "aria-label": "Note",
+      oninput: (e) => { d.note = e.target.value; } });
+    note.value = d.note;
+  }
+  S.$save = button("Save", save, { primary: true, key: "Enter" });
+  S.$answer.replaceChildren(
+    panel({ title: "Your answer" },
+      h("div", { class: "choices" }, choiceButtons),
+      followups,
+      note ? h("label", { class: "field" }, "Note", note) : h("button", { type: "button", class: "btn small", onclick: openNote }, kbd("n"), "Add a note"),
+      S.error && errorBox(S.error)),
+    h("div", { class: "dock" },
+      h("p", { class: "hint", id: "need", role: "status", "aria-live": "polite" }),
+      h("div", { class: "actions" },
+        button("Back", back, { key: "ArrowLeft", disabled: S.i === 0 }),
+        h("span", { class: "grow" }),
+        button("Stop here", showDone, { small: true }),
+        S.$save),
+      h("p", { class: "hint" }, "In a text box, ⌘⏎ saves and Esc leaves the box.")));
+  S.$answer.querySelectorAll("textarea[data-fit]").forEach(fit);
+  updateSave();
+}
+
+function updateSave() {
+  const need = !S.draft.answer ? "Choose an answer." : missing().length ? "Answer: " + missing().map((f) => f.prompt).join(" / ") : "";
+  S.$save.disabled = !!need || S.saving;
+  const el = S.$answer.querySelector("#need");
+  if (el) el.textContent = need;
+}
+
+// Enter with something missing: point at it rather than do nothing.
+function nudge() {
+  S.$answer.querySelector("#need").classList.add("warn");
+  const first = missing()[0];
+  const el = first && S.$answer.querySelector(`[data-followup="${first.key}"]`);
+  if (el) { el.classList.add("wanted"); el.scrollIntoView({ block: "nearest" }); }
+}
+
+async function save() {
+  if (screen !== "item" || S.saving) return;
+  if (!S.draft.answer || missing().length) { nudge(); return; }
+  const item = S.items[S.i];
+  const body = {
+    session: S.session,
+    item_id: item.id,
+    item_hash: item.hash,
+    answer: S.draft.answer,
+    followups: followupPayload(item),
+    note: S.draft.note.trim(),
+    seconds: Math.min(Math.round(clockRead() * 10) / 10, 86400),
+  };
+  const sig = JSON.stringify([body.answer, body.followups, body.note]);
+  if (S.sent[S.i] === sig) {
+    S.i += 1;
+    if (S.i < S.items.length) showItem(); else showDone();
+    return;
+  }
+  S.saving = true;
+  updateSave();
+  try {
+    await api("POST", `/tasks/${encodeURIComponent(S.tid)}/labels`, body);
+  } catch (err) {
+    S.saving = false;
+    S.error = err;
+    renderAnswer();
+    return;
+  }
+  S.saving = false;
+  S.answers[S.i] = structuredClone({ ...S.draft, noteOpen: false });
+  S.sent[S.i] = sig;
+  S.times.push(body.seconds);
+  S.i += 1;
+  if (S.i < S.items.length) showItem(); else showDone();
+}
+
+function back() {
+  if (S.i === 0) return;
+  S.i -= 1;
+  showItem();
+}
+
+// ---------- end of session ----------
+
+function showDone() {
+  screen = "done";
+  const labeled = S.answers.filter(Boolean).length;
+  $crumb.textContent = S.card.title;
+  $progress.textContent = S.items.length ? `${labeled} of ${S.items.length}` : "";
+  const lines = S.items.length
+    ? [`You labeled ${labeled} of ${S.items.length}.`, labeled < S.items.length ? " The rest stay waiting for the next session." : ""]
+    : ["Nothing was waiting."];
+  $app.replaceChildren(h("div", { class: "stack" },
+    panel({ title: "Session done" },
+      h("p", { class: "score" }, lines.join("")),
+      h("p", { class: "sub" }, S.card.has_judge
+        ? "Finish shows the judge's answers and locks every label you haven't compared yet, including ones from an earlier session you didn't finish. To change an answer, go back first."
+        : "Finish locks every label you haven't locked yet, including ones from an earlier session you didn't finish. To change an answer, go back first.")),
+    h("div", { class: "actions" },
+      S.items.length > 0 && button("Back", resume, { key: "ArrowLeft" }),
+      h("span", { class: "grow" }),
+      button("Finish", finish, { primary: true, key: "Enter" }))));
+  window.scrollTo(0, 0);
+}
+
+// Back from the end: to the item you stopped on, or the last one.
+function resume() {
+  S.i = Math.min(S.i, S.items.length - 1);
+  showItem();
+}
+
+async function finish() {
+  if (screen !== "done") return;
+  screen = "finishing";
+  let r;
+  try { r = await api("POST", `/tasks/${encodeURIComponent(S.tid)}/finish`, { session: S.session }); }
+  catch (err) { fatal(err); return; }
+  showResults(r);
+}
+
+function choiceLabel(key) { return (S.card.choices.find((c) => c.key === key) || { label: key }).label; }
+
+function followupText(f, v, prefill) {
+  if (f.kind === "single") return (f.options.find((o) => o.key === v) || { label: v }).label;
+  if (f.kind === "multi") return v.map((k) => (f.options.find((o) => o.key === k) || { label: k }).label).join(", ");
+  if (f.kind === "edit") {
+    const changed = changedFields(f, v, prefill);
+    return changed.length ? changed.map((x) => `${x.label}: ${v[x.key] || "(empty)"}`).join("\n") : "No changes";
+  }
+  return v;
+}
+
+function words(key) { return key.replaceAll("_", " "); }
+
+function yours(r) {
+  return h("dl", { class: "fields" },
+    h("dt", {}, "answer"), h("dd", {}, choiceLabel(r.answer)),
+    Object.entries(r.followups).map(([k, v]) => {
+      const f = S.card.followups.find((x) => x.key === k);
+      return [h("dt", {}, words(k)), h("dd", {}, f ? followupText(f, v, r.prefill) : JSON.stringify(v))];
+    }),
+    r.note && [h("dt", {}, "note"), h("dd", {}, r.note)]);
+}
+
+function judgeFields(judge, done) {
+  const compare = done.compare;
+  if (!judge) return h("p", { class: "lo" }, "No judge answer for this item.");
+  return h("dl", { class: "fields" }, Object.entries(judge).map(([k, v]) => {
+    const c = compare.find((x) => x.judge_field === k);
+    const f = c && S.card.followups.find((x) => x.key === c.followup);
+    const text = f && f.kind === "single" && typeof v === "string" ? followupText(f, v)
+      : typeof v === "string" ? v : JSON.stringify(v);
+    const same = k === done.judge_field && done.judge_map[typeof v === "string" ? v : JSON.stringify(v)];
+    return [h("dt", {}, words(k)), h("dd", {}, same && same.length ? `${text} (same as ${same.map(choiceLabel).join(" or ")})` : text)];
+  }));
+}
+
+function resultPanel(r, title, done) {
+  return panel({ title, right: r.id },
+    done.has_judge
+      ? h("div", { class: "versus" },
+        h("div", {}, h("h3", {}, "YOU"), yours(r)),
+        h("div", {}, h("h3", {}, "JUDGE"), judgeFields(r.judge, done)))
+      : yours(r),
+    foldPanel({ title: "The item" }, r.display.map(renderBlock)));
+}
+
+function showResults(r) {
+  screen = "results";
+  $progress.textContent = "";
+  const disagreed = r.items.filter((x) => x.agrees === false);
+  const agreed = r.items.filter((x) => x.agrees === true);
+  const other = r.items.filter((x) => x.agrees == null);
+  const headline = !r.revealed ? (r.has_judge ? "Nothing new to compare." : "Nothing new to lock.")
+    : !r.has_judge ? `${plural(r.revealed, "label")} locked.`
+    : r.compared ? `You and the judge agreed on ${r.agreed} of ${r.compared}.`
+    : "None of these could be compared with the judge.";
+  const notes = [];
+  if (r.revealed && r.has_judge) notes.push(`${plural(r.revealed, "label")} now locked.`);
+  const noJudge = other.filter((x) => x.answer !== "cant_tell").length;
+  if (r.has_judge && noJudge) notes.push(`${noJudge} had no judge answer.`);
+  const tally = S.card.choices
+    .map((c) => [c.label, r.items.filter((x) => x.answer === c.key).length])
+    .filter(([, n]) => n > 0);
+  $app.replaceChildren(h("div", { class: "stack" },
+    panel({ title: "Results", count: r.revealed },
+      h("p", { class: "score" }, headline),
+      tally.length > 0 && h("p", { class: "facts" }, tally.map(([label, n]) => `${label} ${n}`).join(" · ")),
+      notes.length > 0 && h("p", { class: "sub" }, notes.join(" "))),
+    disagreed.map((x) => resultPanel(x, "Disagreed", r)),
+    agreed.length > 0 && foldPanel({ title: `Agreed (${agreed.length})` },
+      agreed.map((x) => h("div", { class: "row" }, h("span", { class: "mark-good" }, "✓"), h("span", {}, choiceLabel(x.answer)), h("span", { class: "id" }, x.id)))),
+    other.length > 0 && (r.has_judge
+      ? foldPanel({ title: `Not compared (${other.length})` }, other.map((x) => resultPanel(x, "Not compared", r)))
+      : foldPanel({ title: `Your labels (${other.length})`, open: true }, other.map((x) => resultPanel(x, choiceLabel(x.answer), r)))),
+    h("div", { class: "actions" }, h("span", { class: "grow" }), button("Back to inbox", showInbox, { primary: true, key: "Enter" }))));
+  window.scrollTo(0, 0);
+  $app.focus({ preventScroll: true });
+}
+
+// ---------- keys ----------
+
+const keys = {
+  inbox(k) {
+    const startableTasks = inbox.filter(startable);
+    if (k === "Enter" && startableTasks.length) { showCard(startableTasks[0].id); return true; }
+    if (/^[1-9]$/.test(k)) {
+      const t = inbox[Number(k) - 1];
+      if (t && startable(t)) { showCard(t.id); return true; }
+    }
+    return false;
+  },
+  card(k) {
+    if (k === "Enter") { startSession(); return true; }
+    if (k === "Escape") { showInbox(); return true; }
+    return false;
+  },
+  item(k) {
+    if (k === "Enter") { save(); return true; }
+    if (k === "ArrowLeft") { back(); return true; }
+    if (k === "n") { openNote(); return true; }
+    const c = S.card.choices.find((x) => x.hotkey === k);
+    if (c) { choose(c.key); return true; }
+    for (const f of visibleFollowups()) {
+      const o = f.options.find((x) => x.hotkey === k);
+      if (o) { pick(f, o.key); return true; }
+    }
+    return false;
+  },
+  done(k) {
+    if (k === "Enter") { finish(); return true; }
+    if (k === "ArrowLeft" && S.items.length) { resume(); return true; }
+    return false;
+  },
+  results(k) {
+    if (k === "Enter") { showInbox(); return true; }
+    return false;
+  },
+  error(k) {
+    if (k === "Enter") { showInbox(); return true; }
+    return false;
+  },
+};
+
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  const typing = t instanceof HTMLElement && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable);
+  if (typing) {
+    if (e.key === "Escape") { e.preventDefault(); t.blur(); }
+    else if (e.key === "Enter" && screen === "item" && (e.metaKey || e.ctrlKey || t.tagName === "INPUT")) { e.preventDefault(); save(); }
+    return;
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const handler = keys[screen];
+  if (handler && handler(k)) e.preventDefault();
+});
+
+showInbox();
+</script>
+</body>
+</html>
