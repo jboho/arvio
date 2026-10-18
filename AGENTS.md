@@ -4,7 +4,7 @@ arvio shows eval items to a person one at a time, with the question and the mean
 
 ## Layout
 
-- `src/arvio/task.py`: reads and checks a task folder (card, items, label log). Every reader fails closed and names the file and line.
+- `src/arvio/task.py`: reads and checks a task folder (card, items, label log). Every reader fails closed and names the file, plus the line in the JSONL files or the setting in `task.toml`.
 - `src/arvio/store.py`: atomic writes, the fsync'd label append, flock, and the inbox registry (`$ARVIO_DATA_DIR/tasks.json`, default `~/.arvio`).
 - `src/arvio/stats.py`: Wilson range, multi-class Cohen's kappa, seeded bootstrap.
 - `src/arvio/cli.py`: the `arvio` command (`add`, `remove`, `status`, `check`).

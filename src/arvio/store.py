@@ -34,7 +34,7 @@ def atomic_write(path: Path, text: str, mode: int = 0o644) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
             f.flush()
-            os.fsync(f.fileno())
+            _sync(f.fileno())
         os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
@@ -47,9 +47,9 @@ def atomic_write(path: Path, text: str, mode: int = 0o644) -> None:
 def append_jsonl(path: Path, row: dict) -> None:
     """Append one JSON line and sync it to disk before returning.
 
-    If the file doesn't end in a newline (a write cut short), the row starts on
-    a new line, so the cut line stays visible to `arvio check` and this row
-    stays intact.
+    Callers hold the file's lock. A last line without its newline is left by
+    a write that was cut short. If it parses, it only lacks the newline. If
+    not, it moves to PATH.torn, so the log stays readable and the text is kept.
     """
     data = (json.dumps(row, ensure_ascii=False) + "\n").encode()
     created = not path.exists()
@@ -57,15 +57,55 @@ def append_jsonl(path: Path, row: dict) -> None:
     try:
         size = os.fstat(fd).st_size
         if size and os.pread(fd, 1, size - 1) != b"\n":
-            data = b"\n" + data
-        view = memoryview(data)
-        while view:
-            view = view[os.write(fd, view) :]
-        os.fsync(fd)
+            text = os.pread(fd, size, 0)
+            start = text.rfind(b"\n") + 1
+            tail = text[start:]
+            if not tail.strip() or _parses(tail):
+                data = b"\n" + data
+            else:
+                _append_bytes(path.with_name(path.name + ".torn"), tail + b"\n")
+                os.ftruncate(fd, start)
+        _write_all(fd, data)
+        _sync(fd)
     finally:
         os.close(fd)
     if created:
         _fsync_dir(path.parent)
+
+
+def _parses(raw: bytes) -> bool:
+    try:
+        json.loads(raw.decode("utf-8"))
+    except (ValueError, RecursionError):
+        return False
+    return True
+
+
+def _append_bytes(path: Path, data: bytes) -> None:
+    fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        _write_all(fd, data)
+        _sync(fd)
+    finally:
+        os.close(fd)
+
+
+def _write_all(fd: int, data: bytes) -> None:
+    view = memoryview(data)
+    while view:
+        view = view[os.write(fd, view) :]
+
+
+def _sync(fd: int) -> None:
+    """Flush a file to the drive. On macOS, fsync stops at the drive's own
+    cache, which a power cut loses; F_FULLFSYNC flushes that too."""
+    if hasattr(fcntl, "F_FULLFSYNC"):
+        try:
+            fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+            return
+        except OSError:
+            pass
+    os.fsync(fd)
 
 
 def _fsync_dir(folder: Path) -> None:
@@ -108,9 +148,11 @@ def read_registry() -> list[dict] | None:
         data = json.loads(file.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return []
-    except (OSError, UnicodeDecodeError, ValueError):
+    except (OSError, UnicodeDecodeError, ValueError, RecursionError):
         return None
-    tasks = data.get("tasks") if isinstance(data, dict) else None
+    if not isinstance(data, dict) or data.get("format") != REGISTRY_FORMAT:
+        return None
+    tasks = data.get("tasks")
     if not isinstance(tasks, list) or not all(
         isinstance(t, dict) and isinstance(t.get("dir"), str) for t in tasks
     ):

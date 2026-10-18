@@ -134,6 +134,14 @@ def item(notice, summary, highlight, verdict, reason, line):
             "fields": [["Line", f"{line}ern line"], ["Posted by", "Station office"]],
             "collapsed": True,
         },
+        {
+            "kind": "text",
+            "title": "Notice record",
+            "text": f"board={line}-concourse\nposted_by=station-office\n"
+            f"chars={len(notice)}",
+            "mono": True,
+            "collapsed": True,
+        },
     ]
     if "Platform 2" in notice:
         display.append(

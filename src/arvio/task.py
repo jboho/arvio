@@ -1,8 +1,9 @@
 """Read and check a task folder: task.toml, items.jsonl and labels.jsonl.
 
 The format is specified in docs/format.md. Every reader here fails closed: a
-problem in any file is reported with its file and line, and a task with an
-error never loads.
+problem is reported with its file, and with its line in the JSONL files (a
+task.toml problem names the setting instead), and a task with an error never
+loads.
 """
 
 from __future__ import annotations
@@ -24,7 +25,8 @@ FOLLOWUP_KINDS = ("single", "multi", "text", "edit")
 BLOCK_KINDS = ("text", "diff", "fields")
 KEY_RE = re.compile(r"[a-z0-9_]{1,40}")
 HOTKEY_RE = re.compile(r"[a-z0-9]")
-ID_RE = re.compile(r"[A-Za-z0-9._:-]{1,200}")
+ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}")
+MAX_SECONDS = 86400
 PACE_WINDOW = 20
 PACE_MIN_LABELS = 3
 
@@ -42,7 +44,14 @@ class Problem:
 
     def __str__(self) -> str:
         where = f"{self.file}:{self.line}" if self.line else str(self.file)
-        return f"{where}: {'warning' if self.warning else 'error'}: {self.message}"
+        level = "warning" if self.warning else "error"
+        return _printable(f"{where}: {level}: {self.message}")
+
+
+def _printable(text: str) -> str:
+    """Escape control characters: messages quote file contents, and an escape
+    sequence in a judge value must not reach the terminal as one."""
+    return "".join(c if c.isprintable() else repr(c)[1:-1] for c in text)
 
 
 class TaskError(Exception):
@@ -180,7 +189,7 @@ class Task:
             "items": len(self.items),
             "waiting": waiting,
             "labeled": len(self.labels.current),
-            "revealed": len(self.labels.revealed & self.labels.current.keys()),
+            "revealed": len(self.labels.revealed),
             "older": len(self.labels.older),
             "last_at": self.labels.last_at,
             "next_n": next_n,
@@ -215,6 +224,12 @@ STRS = (
 TABLES = (
     "a list of tables",
     lambda v: isinstance(v, list) and all(isinstance(x, dict) for x in v),
+)
+SECONDS = (
+    f"a number from 0 to {MAX_SECONDS}",
+    lambda v: (
+        isinstance(v, int | float) and not isinstance(v, bool) and 0 <= v <= MAX_SECONDS
+    ),
 )
 TABLE = ("a table", lambda v: isinstance(v, dict))
 OBJECT = ("an object", lambda v: isinstance(v, dict))
@@ -301,7 +316,7 @@ LABEL_SCHEMA = {
     "item_hash": (STR, False),
     "followups": (OBJECT, False),
     "note": (STR, False),
-    "seconds": (NUM, False),
+    "seconds": (SECONDS, False),
     "labeled_at": (STR, False),
     "labeler": (STR, False),
     "session": (STR, False),
@@ -546,24 +561,34 @@ def parse_card(data: dict) -> tuple[Card | None, list[str]]:
 
 
 def card_version(question: str, choices, followups, pin: str) -> str:
-    """Hash of what the labeler is asked. Rewording titles or examples keeps it."""
+    """Hash of what the labeler is asked.
+
+    Rewording titles or examples keeps it, and so does reordering: every list
+    is sorted by key first.
+    """
+
+    def options(opts) -> list:
+        return sorted([o.key, o.meaning] for o in opts)
+
     return short_hash(
         {
-            "format": FORMAT,
             "question": question,
-            "choices": [[c.key, c.meaning] for c in choices],
-            "followups": [
-                {
-                    "key": f.key,
-                    "when": list(f.when),
-                    "kind": f.kind,
-                    "required": f.required,
-                    "prompt": f.prompt,
-                    "options": [[o.key, o.meaning] for o in f.options],
-                    "fields": [x.key for x in f.fields],
-                }
-                for f in followups
-            ],
+            "choices": options(choices),
+            "followups": sorted(
+                (
+                    {
+                        "key": f.key,
+                        "when": sorted(f.when),
+                        "kind": f.kind,
+                        "required": f.required,
+                        "prompt": f.prompt,
+                        "options": options(f.options),
+                        "fields": sorted(x.key for x in f.fields),
+                    }
+                    for f in followups
+                ),
+                key=lambda f: f["key"],
+            ),
             "pin": pin,
         }
     )
@@ -604,7 +629,8 @@ def _followup_value_error(f: Followup, value: Any) -> str | None:
         ok = isinstance(value, str) and value in option_keys
         return None if ok else "must be one of its option keys"
     if f.kind == "multi":
-        ok = isinstance(value, list) and all(v in option_keys for v in value)
+        ok = isinstance(value, list)
+        ok = ok and all(isinstance(v, str) and v in option_keys for v in value)
         ok = ok and len(set(value)) == len(value)
         return None if ok else "must be a list of its option keys, each once"
     if f.kind == "text":
@@ -626,27 +652,60 @@ def read_card(file: Path) -> tuple[Card | None, list[Problem]]:
     return card, [Problem(file, None, e) for e in errs]
 
 
-def read_jsonl(file: Path, problems: list[Problem]) -> list[tuple[int, Any]] | None:
+def _object(pairs: list[tuple[str, Any]]) -> dict:
+    obj: dict = {}
+    for key, value in pairs:
+        if key in obj:
+            raise ValueError(f"key '{key[:40]}' appears twice")
+        obj[key] = value
+    return obj
+
+
+def _no_constant(name: str) -> Any:
+    raise ValueError(f"{name} is not valid JSON")
+
+
+def read_jsonl(
+    file: Path, problems: list[Problem], torn_tail_ok: bool = False
+) -> list[tuple[int, Any]] | None:
     """(line number, value) per non-blank line; None if the file can't be read.
 
     Splits on newlines only: str.splitlines() would also split on U+2028,
-    which JSON strings may contain raw.
+    which JSON strings may contain raw. With torn_tail_ok, a last line that
+    has no newline and doesn't parse is a write still in progress or cut
+    short, so it is skipped with a warning.
     """
     try:
         text = file.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
         problems.append(Problem(file, None, f"cannot read: {e}"))
         return None
+    lines = text.split("\n")
     rows = []
-    for n, line in enumerate(text.split("\n"), 1):
+    for n, line in enumerate(lines, 1):
         if not line.strip():
             continue
         try:
-            rows.append((n, json.loads(line)))
-        except json.JSONDecodeError as e:
-            problems.append(
-                Problem(file, n, f"not valid JSON: {e.msg} (column {e.colno})")
+            value = json.loads(
+                line, object_pairs_hook=_object, parse_constant=_no_constant
             )
+            # A lone surrogate parses but can't be written back as UTF-8.
+            json.dumps(value, ensure_ascii=False).encode()
+        except json.JSONDecodeError as e:
+            message = f"not valid JSON: {e.msg} (column {e.colno})"
+        except UnicodeEncodeError:
+            message = "has a broken character (half of a surrogate pair)"
+        except (ValueError, RecursionError) as e:
+            message = f"not valid JSON: {str(e)[:120]}"
+        else:
+            rows.append((n, value))
+            continue
+        if torn_tail_ok and n == len(lines):
+            problems.append(
+                Problem(file, n, "the last line is cut short; ignored", warning=True)
+            )
+        else:
+            problems.append(Problem(file, n, message))
     return rows
 
 
@@ -676,6 +735,36 @@ def _block_errors(block: Any, i: int) -> list[str]:
     return errs
 
 
+def _judge_errors(card: Card, judge: dict) -> list[str]:
+    """A judge object under a card with [agreement]: no silent "no judge"."""
+    a = card.agreement
+    value = judge.get(a.judge_field)
+    if value is None:
+        return [
+            f"judge: has no '{a.judge_field}'; write \"judge\": null for an item "
+            "with no judge answer"
+        ]
+    errs = []
+    if judge_key(value) not in a.map:
+        errs.append(
+            f"judge {a.judge_field}: {judge_key(value)[:40]} is not in the card's "
+            "agreement map"
+        )
+    for followup_key, judge_field in a.compare:
+        theirs = judge.get(judge_field)
+        f = card.followup(followup_key)
+        if theirs is None or f is None:
+            continue
+        if f.kind == "text" and not isinstance(theirs, str):
+            errs.append(f"judge {judge_field}: must be a string to compare")
+        elif f.kind == "single" and judge_key(theirs) not in {o.key for o in f.options}:
+            errs.append(
+                f"judge {judge_field}: {judge_key(theirs)[:40]} is not an option "
+                f"of follow-up '{followup_key}'"
+            )
+    return errs
+
+
 def read_items(file: Path, card: Card) -> tuple[list[Item] | None, list[Problem]]:
     problems: list[Problem] = []
     if not file.exists():
@@ -685,6 +774,7 @@ def read_items(file: Path, card: Card) -> tuple[list[Item] | None, list[Problem]
         return None, problems
     items: list[Item] = []
     first_line: dict[str, int] = {}
+    edit_keys = {x.key for f in card.followups for x in f.fields}
     for n, row in rows:
         errs: list[str] = []
         it = _shape(errs, row, "", ITEM_SCHEMA)
@@ -703,14 +793,11 @@ def read_items(file: Path, card: Card) -> tuple[list[Item] | None, list[Problem]
             prefill = it.get("prefill", {})
             if not all(isinstance(v, str) for v in prefill.values()):
                 errs.append("prefill: values must be strings")
+            for key in sorted(prefill.keys() - edit_keys):
+                errs.append(f"prefill: '{key[:40]}' is not an edit field on the card")
             judge = it.get("judge")
-            if card.agreement is not None:
-                cls = card.agreement.judge_class(judge)
-                if cls is not None and cls not in card.agreement.map:
-                    errs.append(
-                        f"judge {card.agreement.judge_field}: {cls} is not in the "
-                        "card's agreement map"
-                    )
+            if card.agreement is not None and judge is not None:
+                errs.extend(_judge_errors(card, judge))
             if not errs:
                 items.append(
                     Item(
@@ -739,7 +826,7 @@ def read_labels(
     if not file.exists():
         return labels, []
     problems: list[Problem] = []
-    rows = read_jsonl(file, problems)
+    rows = read_jsonl(file, problems, torn_tail_ok=True)
     if rows is None:
         return None, problems
     older: set[str] = set()
@@ -753,15 +840,19 @@ def read_labels(
         if kind == "reveal":
             r = _shape(errs, row, "", REVEAL_SCHEMA)
             if r is not None and r["task_version"] == card.version:
+                # A reveal locks only labels made before it: arvio shows the
+                # judge for labeled items only, so an unlabeled id here was
+                # never shown and stays open.
                 for item_id in r["item_ids"]:
-                    if item_id not in labels.current:
+                    if item_id in labels.current:
+                        labels.revealed.add(item_id)
+                    else:
                         note(n, f"reveal for '{item_id}', which has no label", True)
-                    labels.revealed.add(item_id)
         elif kind == "label":
             r = _shape(errs, row, "", LABEL_SCHEMA)
             if r is not None:
                 item_id = r["item_id"]
-                if isinstance(r.get("seconds"), int | float):
+                if "seconds" in r:
                     labels.seconds.append(float(r["seconds"]))
                 labels.last_at = max(labels.last_at, r.get("labeled_at", ""))
                 if r["task_version"] != card.version:

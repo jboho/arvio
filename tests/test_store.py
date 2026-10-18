@@ -1,6 +1,7 @@
 import json
 import os
 import stat
+import threading
 
 import pytest
 
@@ -36,15 +37,20 @@ def test_append_jsonl_adds_one_line_per_row(tmp_path):
     assert path.read_text(encoding="utf-8") == '{"a": 1}\n{"b": "é"}\n'
 
 
-def test_append_jsonl_after_a_cut_line_starts_a_new_line(tmp_path):
+def test_append_jsonl_moves_a_cut_line_aside(tmp_path):
     path = tmp_path / "labels.jsonl"
     path.write_text('{"a": 1}\n{"b":', encoding="utf-8")
     store.append_jsonl(path, {"c": 3})
-    assert path.read_text(encoding="utf-8").splitlines() == [
-        '{"a": 1}',
-        '{"b":',
-        '{"c": 3}',
-    ]
+    assert path.read_text(encoding="utf-8") == '{"a": 1}\n{"c": 3}\n'
+    assert (tmp_path / "labels.jsonl.torn").read_text(encoding="utf-8") == '{"b":\n'
+
+
+def test_append_jsonl_keeps_a_whole_line_that_lacks_its_newline(tmp_path):
+    path = tmp_path / "labels.jsonl"
+    path.write_text('{"a": 1}\n{"b": 2}', encoding="utf-8")
+    store.append_jsonl(path, {"c": 3})
+    assert path.read_text(encoding="utf-8") == '{"a": 1}\n{"b": 2}\n{"c": 3}\n'
+    assert not (tmp_path / "labels.jsonl.torn").exists()
 
 
 def test_register_is_idempotent_and_private(data_dir, tmp_path):
@@ -71,8 +77,17 @@ def test_missing_registry_is_empty_and_corrupt_registry_is_none(data_dir):
     data_dir.mkdir()
     (data_dir / "tasks.json").write_text("{not json", encoding="utf-8")
     assert store.read_registry() is None
-    (data_dir / "tasks.json").write_text('{"tasks": [{"x": 1}]}', encoding="utf-8")
+    (data_dir / "tasks.json").write_text(
+        '{"format": 1, "tasks": [{"x": 1}]}', encoding="utf-8"
+    )
     assert store.read_registry() is None
+
+
+def test_registry_in_an_unknown_format_reads_as_none(data_dir):
+    data_dir.mkdir()
+    for text in ('{"tasks": []}', '{"format": 2, "tasks": []}'):
+        (data_dir / "tasks.json").write_text(text, encoding="utf-8")
+        assert store.read_registry() is None
 
 
 def test_update_refuses_a_corrupt_registry(data_dir, tmp_path):
@@ -94,6 +109,37 @@ def test_update_refuses_when_the_file_changed_underneath(data_dir, tmp_path):
     with pytest.raises(store.StoreError, match="changed while"):
         store.update_registry(hand_edit)
     assert json.loads(registry.read_text(encoding="utf-8")) == {"tasks": []}
+
+
+def test_update_catches_a_hand_edit_of_the_same_size(data_dir, tmp_path):
+    store.register(tmp_path / "one")
+    registry = data_dir / "tasks.json"
+    text = registry.read_text(encoding="utf-8")
+    edited = text.replace(str(tmp_path / "one"), str(tmp_path / "won"))
+    assert len(edited) == len(text)
+
+    def hand_edit(tasks):
+        registry.write_text(edited, encoding="utf-8")
+        st = registry.stat()
+        os.utime(registry, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+        return tasks
+
+    with pytest.raises(store.StoreError, match="changed while"):
+        store.update_registry(hand_edit)
+    assert registry.read_text(encoding="utf-8") == edited
+
+
+def test_update_waits_for_the_registry_lock(data_dir, tmp_path):
+    data_dir.mkdir()
+    worker = threading.Thread(target=store.register, args=(tmp_path / "one",))
+    with store.locked(data_dir / ".lock"):
+        worker.start()
+        worker.join(timeout=0.3)
+        assert worker.is_alive()
+        assert not (data_dir / "tasks.json").exists()
+    worker.join(timeout=5)
+    assert not worker.is_alive()
+    assert [t["dir"] for t in store.read_registry()] == [str(tmp_path / "one")]
 
 
 def test_folder_lock_refuses_a_second_holder(tmp_path):

@@ -84,6 +84,19 @@ def test_status_with_an_empty_inbox(capsys):
     assert "No tasks yet" in capsys.readouterr().out
 
 
+def test_add_reports_a_data_folder_it_cannot_write(
+    task_dir, tmp_path, monkeypatch, capsys
+):
+    blocker = tmp_path / "a-file"
+    blocker.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("ARVIO_DATA_DIR", str(blocker / "data"))
+    assert main(["add", str(task_dir)]) == 1
+    assert main(["remove", str(task_dir)]) == 1
+    err = capsys.readouterr().err
+    assert err.count("arvio: ") == 2
+    assert "Traceback" not in err
+
+
 def test_remove(task_dir, capsys):
     main(["add", str(task_dir)])
     assert main(["remove", str(task_dir)]) == 0

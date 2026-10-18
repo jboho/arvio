@@ -33,10 +33,14 @@ def kappa(pairs: Sequence[Pair]) -> float | None:
     """Cohen's kappa over (human class, judge class) pairs.
 
     None when the judge used fewer than 2 classes: a constant judge leaves no
-    variation to correct for chance against.
+    variation to correct for chance against. A judge class of None is refused:
+    items without a judge answer must be dropped first, or they would count as
+    a class of their own.
     """
     n = len(pairs)
     judge = Counter(j for _, j in pairs)
+    if None in judge:
+        raise ValueError("a pair has no judge class; drop it before kappa")
     if n == 0 or len(judge) < 2:
         return None
     human = Counter(h for h, _ in pairs)

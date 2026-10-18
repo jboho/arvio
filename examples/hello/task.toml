@@ -49,6 +49,22 @@ kind = "edit"
 prompt = "Optional: correct the sentence so it matches."
 fields = [{ key = "sentence", label = "Corrected sentence", multiline = true }]
 
+[[followups]]
+key = "style"
+when = ["match", "mismatch"]
+kind = "multi"
+prompt = "Optional: anything else about how it reads?"
+options = [
+  { key = "vague", hotkey = "v", label = "Vague", meaning = "A rider couldn't act on it." },
+  { key = "too_long", hotkey = "l", label = "Too long", meaning = "It says more than the notice needs." },
+]
+
+[[followups]]
+key = "missing"
+when = ["cant_tell"]
+kind = "text"
+prompt = "Optional: what would you need to decide?"
+
 [agreement]
 judge_field = "verdict"
 map = { supported = ["match"], unsupported = ["mismatch"] }
@@ -57,3 +73,4 @@ compare = [{ followup = "why", judge_field = "reason" }]
 [gate]
 min_n = 10
 agreement_lower = 0.5
+kappa_lower = 0.2

@@ -41,7 +41,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         return 1
     try:
         added = register(task.dir)
-    except StoreError as e:
+    except (StoreError, OSError) as e:
         print(f"arvio: {e}", file=sys.stderr)
         return 1
     state = "added" if added else "already in your inbox"
@@ -53,7 +53,7 @@ def cmd_remove(args: argparse.Namespace) -> int:
     folder = Path(args.dir).expanduser().resolve()
     try:
         removed = unregister(folder)
-    except StoreError as e:
+    except (StoreError, OSError) as e:
         print(f"arvio: {e}", file=sys.stderr)
         return 1
     print(f"removed: {folder}" if removed else f"not in your inbox: {folder}")

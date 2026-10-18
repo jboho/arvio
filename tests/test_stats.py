@@ -48,6 +48,11 @@ def test_kappa_counts_unmapped_choices_as_disagreement():
     assert kappa(pairs) == pytest.approx(1 / 3)
 
 
+def test_kappa_refuses_a_pair_with_no_judge_class():
+    with pytest.raises(ValueError, match="no judge class"):
+        kappa([("a", "a"), ("b", None)])
+
+
 def test_bootstrap_repeats_with_the_same_seed():
     pairs = two_by_two(20, 5, 10, 15)
     first = bootstrap_kappa(pairs, resamples=200, seed=7)
