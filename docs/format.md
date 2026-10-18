@@ -78,6 +78,7 @@ Rules:
 - `choices` needs `cant_tell` and at least one other choice.
 - `when` is required and lists the choices that show the follow-up.
 - `single` and `multi` follow-ups need `options`. `edit` needs `fields`, each `{ key, label, multiline }`. Each field starts with the item's `prefill[key]`. `text` takes free text.
+- A required `edit` needs at least one field changed from its prefill; the page won't save it unchanged.
 - A judge value that is not a string (for example `true`) is written in `map` as its JSON text: `map = { true = ["correct"], false = ["partly", "wrong"] }`.
 - A choice may appear in at most one `map` list. `cant_tell` may not appear. A choice in no list counts as disagreeing with every judge value.
 - `compare` names a `single` or `text` follow-up and the judge field to compare it with.
@@ -135,6 +136,8 @@ arvio appends one line per event and syncs it to disk before answering the page.
 
 **How to read it:** go through the lines in order and keep only rows whose `task_version` matches the current card. For each item, the latest `label` row wins. A `reveal` row locks those of the items it names that have a label by then: the labeler saw the judge's answer, so arvio refuses any later label for them under the same version. An item a reveal names before it has a label stays open.
 
+You don't have to write that reader yourself. `arvio labels DIR` applies the rule and prints one JSON line per labeled item, in `items.jsonl` order: the `label` row without its `kind`, plus `"locked": true` once the item is revealed. It exits 1 and prints nothing when the task has an error, so a script never reads a half-checked log.
+
 `arvio check` also warns, without failing, when a label comes after its item's reveal (it is ignored), when a reveal names an item with no label, and when an item changed after it was labeled.
 
 A last line with no newline that doesn't parse is a write that was cut short (or is still in progress). Readers skip it with a warning. Before its next append, arvio moves that text to `labels.jsonl.torn` and starts on a clean line.
@@ -142,3 +145,27 @@ A last line with no newline that doesn't parse is a write that was cut short (or
 ## The inbox
 
 `arvio add DIR` checks a task folder and records its absolute path in `$ARVIO_DATA_DIR/tasks.json` (default `~/.arvio`). `arvio remove DIR` takes it off; the task's files stay. The registry holds paths only, never items or labels.
+
+## The labeling page
+
+`arvio` with no command starts a small web server for your inbox and opens the page in your browser (`--no-browser` prints the link instead). Stop it with Ctrl-C. With an empty inbox it prints how to add a task and exits.
+
+- The server listens only on 127.0.0.1, on a free port. The link carries a key that changes every time arvio starts; the page sends it back with every API request, and the server refuses API requests without it. It refuses every request from another host name or another page.
+- One arvio runs per inbox (it holds `$ARVIO_DATA_DIR/server.lock`), and it locks every task folder it serves. A folder another arvio holds shows as "open in another arvio" and can't be started.
+- Items come in a fixed order made from a hash of the card version and the item id, never the file's or the judge's order. There is no skip: "Can't tell" is the way out.
+- Keys: a choice's or option's hotkey picks it, `N` opens the note, Enter saves and moves on, ← goes back one item. On the inbox, Enter or `1`-`9` opens a task.
+- Each label is appended to `labels.jsonl` and synced to disk when you save it. `labeler` is `$ARVIO_LABELER`, or your login name if it is not set.
+- Finish (or Enter on the last screen) writes one `reveal` row for every item labeled under the current card and not yet revealed, including any left from a session you closed early, and only then shows the judge's answers: how many you agreed on, and each disagreement. Those labels are locked from then on. A card with no `[agreement]` has no judge to show, so Finish only locks the labels and counts them per choice.
+- The page measures your pace from the time it was visible, and uses the median of your last 20 labels once you have 3.
+
+## arvio report
+
+`arvio report DIR [--by META_KEY] [--json]` reads the current labels (the latest per item under the current card) and writes `report.md` and `report.json` into the task folder, each by temp file and rename.
+
+- Counts per choice and the share of "can't tell".
+- With `[agreement]`: how many labels agree with the judge, with a 95% Wilson range; Cohen's kappa with a 95% range from 1,000 bootstrap resamples (seed 42, so the same labels give the same range); and a table of the judge's answers against yours. Kappa is not defined when the judge gave only one answer across the compared items. "Can't tell" labels and items with no judge answer are counted but never compared.
+- Each `compare` entry: how often the follow-up matches the judge's field (text compared without case or surrounding spaces).
+- `--by KEY` repeats the numbers per value of `meta[KEY]`; items without it go under `(none)`.
+- With `[gate]`: passes only when at least `min_n` labels were compared and the low end of every range the gate names clears its threshold.
+
+Exit codes: 0 when the report was written and the gate passed or there is none, 2 when the gate did not pass (including too few labels), 1 when the task has errors or the report can't be written. `--json` prints `report.json` instead of the Markdown. Its `format` key is 1.

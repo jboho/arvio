@@ -7,7 +7,10 @@ arvio shows eval items to a person one at a time, with the question and the mean
 - `src/arvio/task.py`: reads and checks a task folder (card, items, label log). Every reader fails closed and names the file, plus the line in the JSONL files or the setting in `task.toml`.
 - `src/arvio/store.py`: atomic writes, the fsync'd label append, flock, and the inbox registry (`$ARVIO_DATA_DIR/tasks.json`, default `~/.arvio`).
 - `src/arvio/stats.py`: Wilson range, multi-class Cohen's kappa, seeded bootstrap.
-- `src/arvio/cli.py`: the `arvio` command (`add`, `remove`, `status`, `check`).
+- `src/arvio/report.py`: agreement with the judge, overall and per `meta` key; writes `report.md` and `report.json`.
+- `src/arvio/server.py`: the labeling page's HTTP server (127.0.0.1, free port, per-launch key) and its JSON API. One lock around every API call, so there is one writer.
+- `src/arvio/static/index.html`: the whole page (HTML, CSS, JS, no build step). Item text goes in with `textContent` only. The fonts next to it are OFL-1.1 (`fonts/OFL.txt`).
+- `src/arvio/cli.py`: the `arvio` command (no command serves the page; `add`, `remove`, `status`, `check`, `report`, `labels`).
 - `examples/hello/`: a made-up task that uses every part of the card. `make_items.py` regenerates its `items.jsonl` the way a project's exporter would.
 - `tests/`: pytest.
 
@@ -19,6 +22,7 @@ arvio shows eval items to a person one at a time, with the question and the mean
 | Lint | `uv run ruff check . && uv run ruff format --check .` |
 | Test | `uv run pytest -q` |
 | Try it | `uv run arvio check examples/hello` |
+| Page, by hand | copy `examples/hello` to a temp folder, set `ARVIO_DATA_DIR` to another temp folder, `uv run arvio add COPY`, then `uv run arvio --no-browser` |
 
 CI (`.github/workflows/test.yml`) runs the same lint and tests on Python 3.11, 3.12 and 3.13.
 
