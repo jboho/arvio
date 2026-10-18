@@ -1,0 +1,59 @@
+format = 1
+title = "Does the summary match the notice?"
+purpose = "A made-up example. It shows every part of a task card, so you can try arvio before writing your own."
+question = "Does the summary sentence say only what the notice says?"
+rules = [
+  "Judge only against the notice shown. Ignore what you know about real trains.",
+  "A sentence that leaves something out still matches, as long as what it says is right.",
+]
+session_size = 10
+seconds_per_item = 30
+pin = "example-judge-v1"
+
+[[choices]]
+key = "match"
+hotkey = "m"
+label = "Matches"
+meaning = "Everything the sentence says is in the notice."
+example = "Notice: 'The 08:10 leaves from platform 4.' Sentence: 'The 08:10 uses platform 4.'"
+
+[[choices]]
+key = "mismatch"
+hotkey = "x"
+label = "Doesn't match"
+meaning = "The sentence says something the notice contradicts or never says."
+example = "Notice: 'The 08:10 leaves from platform 4.' Sentence: 'The 08:10 is cancelled.'"
+
+[[choices]]
+key = "cant_tell"
+hotkey = "u"
+label = "Can't tell"
+meaning = "The notice is not enough to decide."
+
+[[followups]]
+key = "why"
+when = ["mismatch"]
+kind = "single"
+required = true
+prompt = "What is wrong with the sentence?"
+options = [
+  { key = "contradicts", hotkey = "1", label = "Contradicts", meaning = "The notice says otherwise." },
+  { key = "unsupported", hotkey = "2", label = "Not in the notice", meaning = "The notice never says it." },
+  { key = "wrong_number", hotkey = "3", label = "Wrong number", meaning = "A time, platform or count is off." },
+]
+
+[[followups]]
+key = "fix"
+when = ["mismatch"]
+kind = "edit"
+prompt = "Optional: correct the sentence so it matches."
+fields = [{ key = "sentence", label = "Corrected sentence", multiline = true }]
+
+[agreement]
+judge_field = "verdict"
+map = { supported = ["match"], unsupported = ["mismatch"] }
+compare = [{ followup = "why", judge_field = "reason" }]
+
+[gate]
+min_n = 10
+agreement_lower = 0.5
