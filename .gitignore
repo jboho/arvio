@@ -10,3 +10,4 @@ build/
 .ai/memory/
 .ai/handoffs/
 .claude/
+.ai/
