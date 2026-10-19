@@ -30,7 +30,6 @@
 | **License**  | [MIT](LICENSE); the page's fonts are under [OFL-1.1](src/arvio/static/fonts/OFL.txt)       |
 | **Format**   | [Task folder format, version 1](docs/format.md)                                            |
 | **Example**  | [examples/hello](examples/hello), a complete made-up task                                  |
-| **Design**   | [v0.1 design and its decisions](.ai/docs/plans/2026-10-18-arvio-v0.1.md)                   |
 | **Security** | [Report a vulnerability privately](https://github.com/jboho/arvio/security/advisories/new) |
 
 ## Status
