@@ -54,7 +54,7 @@ The format is in [docs/format.md](docs/format.md). [examples/hello](examples/hel
 Needs macOS or Linux, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/).
 
 ```sh
-uv tool install git+https://github.com/jboho/arvio@v0.1.0
+uv tool install git+https://github.com/jboho/arvio@v0.2.0
 arvio check my-task      # check a task folder; exits 1 and names the file and line on any error
 arvio add my-task        # check it and add it to your inbox
 arvio                    # open the labeling page for your inbox
