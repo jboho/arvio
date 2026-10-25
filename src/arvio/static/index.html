@@ -626,8 +626,7 @@ function showItem() {
   updateProgress();
   S.$answer = h("div", { class: "answer" });
   $app.replaceChildren(h("div", { class: "work" },
-    h("div", { class: "content" }, item.display.map(renderBlock),
-      h("p", { class: "hint" }, `Item ${item.id}`)),
+    h("div", { class: "content" }, item.display.map(renderBlock)),
     h("aside", { class: "side" },
       panel({ title: "Question", cls: "qpanel", count: `${S.i + 1}/${S.items.length}` },
         h("p", { class: "question" }, S.card.question)),

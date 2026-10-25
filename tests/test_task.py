@@ -479,3 +479,35 @@ def test_the_spec_examples_pass_the_checker(tmp_path):
     task, problems = check_task(tmp_path)
     assert problems == []
     assert task.card.gate.agreement_lower == 0.7
+
+
+@pytest.mark.parametrize(
+    ("item_id", "meta", "judge", "where"),
+    [
+        ("armB-run3-q01", {"arm": "armB"}, None, "meta.arm"),
+        ("q01-run-3", {"run": 3}, None, "meta.run"),
+        ("q01-gpt-x", {"model": {"name": "GPT"}}, None, "meta.model.name"),
+        ("q01-supported", {}, {"verdict": "supported"}, "judge.verdict"),
+        ("q01-ab", {"tags": ["zz", "ab"]}, None, "meta.tags[1]"),
+    ],
+)
+def test_id_that_repeats_meta_or_judge_warns(task_dir, item_id, meta, judge, where):
+    rows = read_items(task_dir)
+    rows[0].update(id=item_id, meta=meta, judge=judge)
+    write_lines(task_dir / "items.jsonl", rows)
+    found = warnings(task_dir)
+    assert any(":1: warning: id contains the value of " + where in w for w in found)
+
+
+@pytest.mark.parametrize(
+    ("item_id", "meta"),
+    [
+        ("ex-ace42f01", {"arm": "ace", "run": 42}),
+        ("ex-2490d1e619", {"flag": True, "n": 1}),
+    ],
+)
+def test_short_values_inside_a_hash_id_do_not_warn(task_dir, item_id, meta):
+    rows = read_items(task_dir)
+    rows[0].update(id=item_id, meta=meta)
+    write_lines(task_dir / "items.jsonl", rows)
+    assert warnings(task_dir) == []
