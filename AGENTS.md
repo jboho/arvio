@@ -35,5 +35,5 @@ CI (`.github/workflows/test.yml`) runs the same lint and tests on Python 3.11, 3
 - The judge answer and `meta` never reach the page before the session's reveal. Any code that sends item data to the browser must build it from an allow-list of keys.
 - A change to the file format updates `docs/format.md` in the same PR. A change that old files can't satisfy bumps `FORMAT` in `task.py`.
 - No project data in this repo: examples are made up.
-- The version lives only in `pyproject.toml`. There is no CHANGELOG. A release is a PR titled `chore: release X.Y.Z`, then an annotated tag `vX.Y.Z` on the merge commit.
+- The version lives only in `pyproject.toml`. There is no CHANGELOG. A release is a PR titled `chore: release X.Y.Z`, then an annotated tag `vX.Y.Z` on the merge commit, then a GitHub Release on that tag (`gh release create vX.Y.Z --verify-tag`) whose notes list what changed and link the PRs.
 - Conventional commits with a scope (`feat(task): ...`), squash merges.
