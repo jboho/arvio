@@ -101,7 +101,7 @@ One JSON object per line:
 
 | Key | Required | Meaning |
 |---|---|---|
-| `id` | yes | Unique, up to 200 characters of `A-Z a-z 0-9 . _ : -`, starting with a letter or digit. Use a hash of the item's content, so exporting again keeps the same ids. |
+| `id` | yes | Unique, up to 200 characters of `A-Z a-z 0-9 . _ : -`, starting with a letter or digit. Use a hash of the item's content, so exporting again keeps the same ids. The page doesn't show the id while you label, but it does show it on the results screen and it is in the data the page loads, so keep `meta` and `judge` values (a model name, a run number) out of it. |
 | `display` | yes | The blocks shown to the labeler, in order. At least one. |
 | `prefill` | no | Strings that start the `edit` fields, keyed by field key. A key that is no edit field on the card is an error. |
 | `judge` | no | The judge's answer. arvio never sends it to the page until the session ends. `null` or missing means no judge for this item. When the card has `[agreement]`, a `judge` object must hold `judge_field` with a value from `map`, and a field named in `compare` must hold an option key of its `single` follow-up, or a string for a `text` follow-up. |
