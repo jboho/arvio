@@ -1,6 +1,6 @@
 [project]
 name = "arvio"
-version = "0.1.0"
+version = "0.2.0"
 description = "Label eval items by hand, one at a time, with the judge hidden until the session ends"
 readme = "README.md"
 license = "MIT AND OFL-1.1"
