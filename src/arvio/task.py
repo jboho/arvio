@@ -27,6 +27,7 @@ BLOCK_KINDS = ("text", "diff", "fields")
 KEY_RE = re.compile(r"[a-z0-9_]{1,40}")
 HOTKEY_RE = re.compile(r"[a-z0-9]")
 ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}")
+ID_PART_RE = re.compile(r"[._:-]")
 MAX_SECONDS = 86400
 PACE_WINDOW = 20
 PACE_MIN_LABELS = 3
@@ -793,6 +794,38 @@ def _judge_errors(card: Card, judge: dict) -> list[str]:
     return errs
 
 
+def _id_leaks(item_id: str, judge: Any, meta: dict) -> list[str]:
+    """The meta and judge keys whose value shows up in the item's id.
+
+    The page loads the id and the results screen shows it, so such an id can
+    tell the labeler what meta and judge are meant to hide. A number or a
+    string shorter than 4 counts only as a whole part of the id: a hex hash id
+    holds short runs like "42" or "ace" by chance.
+    """
+    low = item_id.lower()
+    parts = set(ID_PART_RE.split(low))
+    found: list[str] = []
+
+    def walk(value: Any, path: str) -> None:
+        if isinstance(value, dict):
+            for k, v in value.items():
+                walk(v, f"{path}.{k[:40]}")
+        elif isinstance(value, list):
+            for i, v in enumerate(value):
+                walk(v, f"{path}[{i}]")
+        elif isinstance(value, str):
+            text = value.lower()
+            if text in parts or (len(text) >= 4 and text in low):
+                found.append(path)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            if str(value) in parts:
+                found.append(path)
+
+    walk(meta, "meta")
+    walk(judge, "judge")
+    return found
+
+
 def read_items(file: Path, card: Card) -> tuple[list[Item] | None, list[Problem]]:
     problems: list[Problem] = []
     if not file.exists():
@@ -838,6 +871,17 @@ def read_items(file: Path, card: Card) -> tuple[list[Item] | None, list[Problem]
                         line=n,
                     )
                 )
+                leaks = _id_leaks(item_id, judge, it.get("meta", {}))
+                if leaks:
+                    problems.append(
+                        Problem(
+                            file,
+                            n,
+                            f"id contains the value of {', '.join(leaks[:3])}; "
+                            "the labeler can see the id, so use a hash instead",
+                            warning=True,
+                        )
+                    )
         problems.extend(Problem(file, n, e) for e in errs)
     if not rows and not problems:
         problems.append(Problem(file, None, "has no items", warning=True))
