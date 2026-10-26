@@ -1,0 +1,331 @@
+.TH ARVIO 1 "2026-10-26" "arvio 0.2.0" "User Commands"
+.SH NAME
+arvio \- label eval items by hand, with the judge's answer hidden until the session ends
+.SH SYNOPSIS
+.B arvio
+[\fB\-\-no\-browser\fR]
+.br
+.B arvio
+.I COMMAND
+[\fIARGUMENT\fR ...]
+.br
+.B arvio \-\-version
+.SH DESCRIPTION
+.B arvio
+shows eval items to one person at a time, with the question and the meaning of each answer on screen.
+The judge's answer stays hidden until the session ends.
+Then arvio shows where you and the judge disagreed, and locks the labels you made.
+.PP
+A project talks to arvio only through files.
+It writes a
+.I task folder
+that holds
+.IR task.toml ,
+.I items.jsonl
+and
+.IR labels.jsonl .
+See
+.BR arvio\-task (5)
+for the format.
+.PP
+With no command, arvio starts the labeling page for your inbox.
+The inbox is the list of task folders you added with
+.BR "arvio add" .
+If the inbox is empty, arvio prints how to add a task and exits with status 0.
+.SH OPTIONS
+.TP
+.B \-\-no\-browser
+With no command, print the page's link instead of opening it in a browser.
+.TP
+.B \-\-version
+Print the version and exit.
+.TP
+.B \-h\fR, \fB\-\-help
+Print a short help text and exit.
+.SH COMMANDS
+.TP
+.B arvio add \fR[\fB\-\-import\fR [\fB\-\-name\fR \fINAME\fR]] \fIDIR\fR
+Check the task folder
+.I DIR
+and add it to your inbox.
+Nothing is added if the check finds an error.
+Adding a folder that is already in the inbox is not an error.
+.RS
+.TP
+.B \-\-import
+First copy
+.I task.toml
+and
+.I items.jsonl
+into arvio's own folder,
+.IR $ARVIO_DATA_DIR/tasks/NAME ,
+and add that copy instead of
+.IR DIR .
+Labels are then written to the copy, so they no longer depend on the project's checkout.
+The project's
+.I labels.jsonl
+is never copied.
+.IP
+Running the import again replaces the card and the items and keeps the labels.
+It is refused, and nothing changes, if the labels would then name an item that is gone, or if a page has the folder open.
+.TP
+.BI \-\-name " NAME"
+The copy's folder name, used with
+.BR \-\-import .
+The default is the name of
+.IR DIR .
+A name has 1 to 64 characters from
+.BR "a\-z 0\-9 . _ \-" ,
+and starts with a letter or digit.
+Using
+.B \-\-name
+without
+.B \-\-import
+is an error.
+.RE
+.TP
+.BI "arvio remove " DIR
+Take
+.I DIR
+off your inbox.
+The folder's files stay.
+Exits 1 if the folder was not in the inbox.
+.TP
+.BI "arvio archive " NAME_OR_DIR
+Move a task to the archived list.
+.I NAME_OR_DIR
+is the path of a folder in your inbox, or the name of an imported task.
+The folder does not move, so its labels and reports stay where they are.
+A page that has the folder open is not affected.
+Exits 1 if the task is not in your inbox.
+.TP
+.BI "arvio unarchive " NAME_OR_DIR
+Move an archived task back to the active list.
+.TP
+.B arvio status \fR[\fB\-\-archived\fR]
+For each active task in the inbox, print how many items are waiting and how many are labeled.
+It also prints how many labels came from an older version of the task card, the date of the last label, and how long the next session takes.
+A task that cannot be opened is listed with its first error, and the command then exits 1.
+Archived tasks are left out and counted on the last line.
+With
+.BR \-\-archived ,
+list the archived tasks instead.
+.TP
+.BI "arvio check " DIR
+Check
+.IR task.toml ,
+.I items.jsonl
+and
+.I labels.jsonl
+in
+.IR DIR .
+Problems go to standard error and name the file, plus the line in the two JSONL files or the setting in
+.IR task.toml .
+Warnings do not change the exit status.
+.TP
+.BI "arvio report " DIR " \fR[\fB\-\-by " META_KEY "\fR] [\fB\-\-json\fR]"
+Compare your labels with the judge's answers.
+Write
+.I report.md
+and
+.I report.json
+into
+.IR DIR ,
+and print the Markdown report.
+.RS
+.TP
+.BI \-\-by " META_KEY"
+Repeat the numbers for each value of that key in the items'
+.B meta
+object.
+Items without the key go under
+.BR (none) .
+.TP
+.B \-\-json
+Print
+.I report.json
+instead of the Markdown.
+.RE
+.IP
+The report shows the count per choice and the share of "can't tell" labels.
+If the task card has an
+.B [agreement]
+section, it also shows how many labels agree with the judge, with a 95% Wilson range,
+and Cohen's kappa with a 95% range from 1,000 bootstrap resamples (seed 42, so the same labels give the same range).
+.TP
+.BI "arvio labels " DIR
+Print the current label for each labeled item as one JSON object per line, in the order of
+.IR items.jsonl .
+Each line is the label row without its
+.B kind
+key, plus
+.B "locked": true
+once the judge's answers were shown for that item.
+Nothing is printed if the task has an error, so a script never reads a half-checked log.
+.SH THE LABELING PAGE
+arvio starts a small web server for your inbox and opens the page in your browser.
+Stop it with Ctrl-C.
+.IP \(bu 2
+The server listens only on 127.0.0.1, on a free port.
+The link carries a key that changes every time arvio starts.
+The server refuses API requests without the key, and requests from another host name or another page.
+.IP \(bu 2
+Only one arvio runs per inbox.
+A task folder that another arvio holds shows as "open in another arvio" and cannot be started.
+.IP \(bu 2
+Items come in a fixed order made from the task card's version and the item's id.
+There is no skip: "Can't tell" is the way out.
+.IP \(bu 2
+A choice's key picks it.
+.B N
+opens the note field.
+.B Enter
+saves and moves on.
+The left arrow goes back one item.
+In the inbox,
+.B Enter
+or
+.BR 1 \- 9
+opens a task.
+.IP \(bu 2
+The page has an Active tab and an Archived tab.
+Each task has a button that moves it between them.
+The page cannot start a session on an archived task until you move it back.
+.IP \(bu 2
+Each label is appended to
+.I labels.jsonl
+and synced to disk when you save it.
+.IP \(bu 2
+Finishing the session writes one reveal row for every item labeled under the current card that is not yet revealed, including items left from a session you closed early.
+Only then does the page show the judge's answers.
+Those labels are locked from then on.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+For
+.BR "arvio report" ,
+the report was written, and the task card's gate passed or the card has none.
+.TP
+.B 1
+An error.
+The task folder has an error, a file could not be read or written, the inbox cannot be read, or (for
+.BR "arvio remove" ,
+.BR "arvio archive"
+and
+.BR "arvio unarchive" )
+the task was not in the inbox.
+.BR "arvio status"
+also exits 1 if any task it lists cannot be opened.
+.TP
+.B 2
+Only from
+.BR "arvio report" :
+the task card sets a pass rule (a gate) and the labels do not meet it yet, including when there are too few labels.
+A script can stop on this status.
+.SH ENVIRONMENT
+.TP
+.B ARVIO_DATA_DIR
+The folder that holds the inbox and the imported tasks.
+The default is
+.IR ~/.arvio .
+.TP
+.B ARVIO_LABELER
+The name written with each label.
+The default is your login name.
+.SH FILES
+.TP
+.I $ARVIO_DATA_DIR/tasks.json
+The inbox.
+It holds the absolute paths of task folders, never items or labels.
+An archived task has
+.B "archived": true
+in its entry.
+.TP
+.I $ARVIO_DATA_DIR/tasks/NAME
+The copy of a task that
+.B "arvio add \-\-import"
+made.
+.TP
+.I $ARVIO_DATA_DIR/server.lock
+Held by the running arvio, so only one runs per inbox.
+.TP
+.I DIR/task.toml
+.TQ
+.I DIR/items.jsonl
+.TQ
+.I DIR/labels.jsonl
+The task folder.
+See
+.BR arvio\-task (5).
+.TP
+.I DIR/labels.jsonl.torn
+Where arvio moves a last line that was cut short, before its next append.
+.TP
+.I DIR/report.md
+.TQ
+.I DIR/report.json
+Written by
+.BR "arvio report" .
+.SH EXAMPLES
+Check a task folder, add it to the inbox, and label it:
+.PP
+.RS
+.nf
+arvio check my\-task
+arvio add my\-task
+arvio
+.fi
+.RE
+.PP
+Keep arvio's own copy of a task, so the labels outlive the project's checkout, and later put it away:
+.PP
+.RS
+.nf
+arvio add \-\-import my\-task
+arvio archive my\-task
+arvio status \-\-archived
+.fi
+.RE
+.PP
+Print the link without opening a browser:
+.PP
+.RS
+.nf
+arvio \-\-no\-browser
+.fi
+.RE
+.PP
+Write the report, broken down by the items' "topic" key, and stop a script if the gate fails:
+.PP
+.RS
+.nf
+arvio report \-\-by topic my\-task || exit $?
+.fi
+.RE
+.PP
+Read the current labels in a script:
+.PP
+.RS
+.nf
+arvio labels my\-task | python3 \-c 'import json, sys; \e
+print(sum(1 for line in sys.stdin if json.loads(line)["locked"]))'
+.fi
+.RE
+.SH NOTES
+arvio uses file locks from
+.BR fcntl (2),
+so it runs on macOS and Linux but not on Windows.
+.PP
+There is one labeler per task.
+A second person's label for an item replaces the first one.
+.SH SEE ALSO
+.BR arvio\-task (5)
+.PP
+The task format is also written out in
+.I docs/format.md
+in the arvio repository, https://github.com/jboho/arvio.
+.SH AUTHOR
+Jonathan Boho.
+.SH LICENSE
+MIT. The fonts the page ships with are under the SIL Open Font License 1.1.

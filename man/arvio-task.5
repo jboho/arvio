@@ -1,0 +1,458 @@
+.TH ARVIO-TASK 5 "2026-10-26" "arvio 0.2.0" "File Formats"
+.SH NAME
+arvio-task \- the task folder that arvio reads and writes (format version 1)
+.SH SYNOPSIS
+.nf
+my\-task/
+    task.toml      the task card
+    items.jsonl    one item per line
+    labels.jsonl   written by arvio
+.fi
+.SH DESCRIPTION
+A task is one folder with three files.
+Your project writes
+.I task.toml
+and
+.IR items.jsonl .
+.BR arvio (1)
+writes
+.IR labels.jsonl .
+Your project never imports arvio: it writes the first two files and reads the third.
+.PP
+.B arvio check
+validates all three and exits 1 on any problem.
+A problem in a JSONL file names the file and the line.
+A problem in
+.I task.toml
+names the file and the setting, for example
+.BR "choice 3 hotkey" .
+Unknown keys are errors, so a typo never silently drops a setting.
+.SH task.toml
+The task card is a TOML file.
+It holds the question, the choices and what each one means, follow-up questions, and how to compare the labels with the judge.
+.SS Top-level keys
+.TP
+.B format
+Required. The format version. It is
+.BR 1 .
+.TP
+.B title
+Required. The name shown in the inbox.
+.TP
+.B purpose
+What the labels are for.
+.TP
+.B question
+Required. The question the labeler answers for each item.
+.TP
+.B rules
+A list of short rules shown with the question.
+.TP
+.B session_size
+Items per session, from 1 to 100. The default is 10.
+.TP
+.B seconds_per_item
+A first time estimate per item, from 1 to 3600, used until arvio has measured the labeler's pace.
+The default is 60.
+.TP
+.B pin
+A string that changes when the judge's instructions change.
+It is part of the task version.
+.SS [[choices]]
+One table per answer.
+Every task needs a choice with the key
+.B cant_tell
+and at least one other choice.
+.TP
+.B key
+1 to 40 characters from
+.BR "a\-z 0\-9 _" .
+.TP
+.B hotkey
+One lowercase letter or digit.
+Hotkeys are unique across the whole card, in the choices and in every follow-up option.
+.B n
+is reserved for the note field.
+.TP
+.B label
+The text shown on the button.
+.TP
+.B meaning
+What the answer means.
+.TP
+.B example
+An optional example.
+.SS [[followups]]
+Optional follow-up questions, asked after a choice is picked.
+.TP
+.B key
+Same rules as a choice's key.
+.TP
+.B when
+Required. The list of choice keys that show this follow-up.
+.TP
+.B kind
+One of
+.BR single ,
+.BR multi ,
+.B text
+or
+.BR edit .
+.TP
+.B required
+True or false. The default is false.
+.TP
+.B prompt
+The question shown.
+.TP
+.B options
+For
+.B single
+and
+.BR multi :
+a list of tables with
+.BR key ,
+.BR hotkey ,
+.B label
+and
+.BR meaning .
+.TP
+.B fields
+For
+.BR edit :
+a list of tables with
+.BR key ,
+.B label
+and
+.BR multiline .
+Each field starts with the item's
+.BI prefill[ key ]
+value.
+A required
+.B edit
+follow-up needs at least one field changed from its prefill, or the page does not save it.
+.SS [agreement]
+Optional. How to compare the labels with the judge.
+.TP
+.B judge_field
+The key in each item's
+.B judge
+object.
+.TP
+.B map
+A table from each judge value to the list of choices that agree with it.
+A choice may appear in at most one list.
+.B cant_tell
+may not appear.
+A choice in no list counts as disagreeing with every judge value.
+A judge value that is not a string, such as
+.BR true ,
+is written in its JSON text:
+.B "map = { true = [\(dqcorrect\(dq], false = [\(dqwrong\(dq] }"
+.TP
+.B compare
+Optional. A list of tables with
+.B followup
+(a
+.B single
+or
+.B text
+follow-up) and
+.B judge_field
+(the judge field to compare it with).
+.SS [gate]
+Optional. A pass rule for
+.BR "arvio report" .
+It needs an
+.B [agreement]
+section.
+.TP
+.B min_n
+At least this many items compared with the judge. 1 or more.
+.TP
+.B kappa_lower
+The low end of kappa's 95% range must be at least this. Between \-1 and 1.
+.TP
+.B agreement_lower
+The low end of the raw agreement's 95% range must be at least this. Between 0 and 1.
+.PP
+A gate sets
+.BR kappa_lower ,
+.B agreement_lower
+or both.
+It passes only when every one it sets holds, with at least
+.B min_n
+items compared.
+.SS Task version
+arvio hashes the question, each choice's key and meaning, each follow-up (key,
+.BR when ,
+kind,
+.BR required ,
+prompt, option keys and meanings, field keys) and
+.B pin
+into a 12-character task version.
+Every label records the version it was made under.
+If you change any of these, older labels stop counting, and their items come back as unlabeled.
+.B "arvio status"
+shows how many older labels there are.
+.PP
+The title, purpose, rules, labels, hotkeys, examples,
+.BR session_size ,
+.B seconds_per_item
+and the order of choices, follow-ups and options are not part of the hash.
+Changing them keeps your labels.
+.SH items.jsonl
+One JSON object per line.
+.TP
+.B id
+Required. Unique. Up to 200 characters from
+.BR "A\-Z a\-z 0\-9 . _ : \-" ,
+starting with a letter or digit.
+Use a hash of the item's content, so that exporting again keeps the same ids.
+The page does not show the id while the labeler works, but the data the page loads contains it.
+Keep values from
+.B meta
+and
+.B judge
+(a model name, a run number) out of it.
+.B "arvio check"
+warns when an id contains one.
+.TP
+.B display
+Required. The blocks shown to the labeler, in order. At least one.
+.TP
+.B prefill
+Strings that start the
+.B edit
+fields, keyed by field key.
+A key that is no edit field on the card is an error.
+.TP
+.B judge
+The judge's answer.
+arvio never sends it to the page until the session ends.
+.B null
+or a missing key means no judge for this item.
+When the card has
+.BR [agreement] ,
+the object must hold
+.B judge_field
+with a value from
+.BR map .
+.TP
+.B meta
+Anything you want for report buckets (see
+.BR "arvio report \-\-by" ).
+It is never sent to the page.
+.SS Display blocks
+.TP
+.B text
+Keys:
+.BR text ;
+optional
+.BR title ,
+.B mono
+(true or false),
+.B highlight
+(a list of exact substrings of
+.BR text ,
+spaces and line breaks included) and
+.B collapsed
+(true or false).
+.TP
+.B diff
+Keys:
+.B text
+(a unified diff); optional
+.B title
+and
+.BR collapsed .
+.TP
+.B fields
+Keys:
+.B fields
+(a list of
+.B [label, value]
+string pairs); optional
+.B title
+and
+.BR collapsed .
+.PP
+All text is shown as plain text.
+Nothing is rendered as HTML or Markdown.
+.PP
+In both JSONL files, a key that appears twice in one object, \fBNaN\fR, \fBInfinity\fR, and half of a surrogate pair are errors.
+.PP
+Write
+.I items.jsonl
+to a temporary file and rename it into place, so that arvio never reads half a file.
+Keep every item that already has a label under the current card: a label whose item is gone is an error.
+A label under an older card whose item is gone only gets a warning.
+.SH labels.jsonl
+arvio appends one line per event and syncs it to disk before answering the page.
+There are two kinds of line.
+.PP
+A
+.B label
+row:
+.PP
+.RS
+.nf
+{"kind": "label", "item_id": "q01\-5d1c2e", "item_hash": "9b04e1c2a7f3",
+ "task_version": "c41d09a2b6e1", "answer": "wrong",
+ "followups": {"why": "unsupported"}, "note": "", "seconds": 38.4,
+ "labeled_at": "2026\-10\-19T16:02:11Z", "labeler": "sam",
+ "session": "s\-20261019T160000Z\-ab12"}
+.fi
+.RE
+.PP
+A
+.B reveal
+row:
+.PP
+.RS
+.nf
+{"kind": "reveal", "item_ids": ["q01\-5d1c2e"],
+ "task_version": "c41d09a2b6e1", "at": "2026\-10\-19T16:09:40Z",
+ "session": "s\-20261019T160000Z\-ab12"}
+.fi
+.RE
+.IP \(bu 2
+.B followups
+holds one value per answered follow-up: an option key (\fBsingle\fR), a list of option keys (\fBmulti\fR), a string (\fBtext\fR), or an object of field values (\fBedit\fR).
+.IP \(bu 2
+.B item_hash
+is a hash of what the labeler saw (\fBdisplay\fR and \fBprefill\fR).
+If it no longer matches the item, the item changed after it was labeled, and
+.B "arvio check"
+warns.
+.IP \(bu 2
+.B seconds
+counts only the time the page was visible, from 0 to 86400.
+.IP \(bu 2
+.B labeler
+is the value of
+.BR ARVIO_LABELER ,
+or the login name if it is not set.
+.SS Reading the log
+Go through the lines in order and keep only rows whose
+.B task_version
+matches the current card.
+For each item, the latest
+.B label
+row wins.
+A
+.B reveal
+row locks those of the items it names that have a label by then, because the labeler saw the judge's answer.
+arvio refuses any later label for them under the same version.
+An item that a reveal names before it has a label stays open.
+.PP
+You do not have to write this reader yourself.
+.B "arvio labels"
+applies the rule and prints one JSON line per labeled item.
+.PP
+A last line with no newline that does not parse is a write that was cut short, or one still in progress.
+Readers skip it with a warning.
+Before its next append, arvio moves that text to
+.I labels.jsonl.torn
+and starts on a clean line.
+.PP
+.B "arvio check"
+also warns, without failing, when a label comes after its item's reveal (it is ignored), when a reveal names an item with no label, when an item changed after it was labeled, and when an item's id contains one of its
+.B meta
+or
+.B judge
+values.
+.SH THE INBOX
+.B "arvio add"
+checks a task folder and records its absolute path in
+.IR $ARVIO_DATA_DIR/tasks.json ,
+which is
+.I ~/.arvio/tasks.json
+by default.
+.B "arvio remove"
+takes it off.
+The task's files stay.
+The inbox holds paths only, never items or labels.
+.PP
+.B "arvio add \-\-import"
+first copies
+.I task.toml
+and
+.I items.jsonl
+into
+.IR $ARVIO_DATA_DIR/tasks/NAME ,
+and adds that copy.
+Labels are written there.
+The project's
+.I labels.jsonl
+is never copied.
+Running the import again replaces the card and the items and keeps the labels.
+It is refused, and nothing changes, if the labels would then name an item that is gone, or if a page has the folder open.
+.PP
+An inbox entry can carry
+.BR """archived"": true" .
+.B "arvio archive"
+sets it and
+.B "arvio unarchive"
+removes it.
+The folder itself never moves.
+An archived task is hidden from the page's Active tab and from
+.BR "arvio status" ,
+and it appears on the Archived tab and under
+.BR "arvio status \-\-archived" .
+The page cannot start a session on an archived task until it is moved back.
+.SH EXAMPLES
+A small card with two choices and the required
+.BR cant_tell :
+.PP
+.RS
+.nf
+format = 1
+title = "Is the draft answer right?"
+question = "Does the draft answer match the source text?"
+
+[[choices]]
+key = "correct"
+hotkey = "c"
+label = "Correct"
+meaning = "The answer says what the source says."
+
+[[choices]]
+key = "wrong"
+hotkey = "w"
+label = "Wrong"
+meaning = "The answer contradicts the source."
+
+[[choices]]
+key = "cant_tell"
+hotkey = "u"
+label = "Can't tell"
+meaning = "The text shown is not enough to decide."
+
+[agreement]
+judge_field = "verdict"
+map = { pass = ["correct"], fail = ["wrong"] }
+.fi
+.RE
+.PP
+One line of
+.IR items.jsonl :
+.PP
+.RS
+.nf
+{"id": "q01\-5d1c2e", "display": [{"kind": "text", "title": "Question",
+ "text": "When does the library open?"}, {"kind": "text",
+ "title": "Draft answer", "text": "09:00"}],
+ "judge": {"verdict": "pass"}, "meta": {"topic": "opening\-hours"}}
+.fi
+.RE
+.PP
+A complete made-up task is in
+.I examples/hello
+in the arvio repository.
+.SH SEE ALSO
+.BR arvio (1)
+.PP
+The same format is written out in
+.I docs/format.md
+in the arvio repository, https://github.com/jboho/arvio.

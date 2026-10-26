@@ -13,6 +13,7 @@ arvio shows eval items to a person one at a time, with the question and the mean
 - `src/arvio/static/index.html`: the whole page (HTML, CSS, JS, no build step). Item text goes in with `textContent` only. The fonts next to it are OFL-1.1 (`fonts/OFL.txt`).
 - `src/arvio/cli.py`: the `arvio` command (no command serves the page; `add`, `archive`, `unarchive`, `remove`, `status`, `check`, `report`, `labels`).
 - `examples/hello/`: a made-up task that uses every part of the card. `make_items.py` regenerates its `items.jsonl` the way a project's exporter would.
+- `man/`: `arvio.1` (the command) and `arvio-task.5` (the task folder format). Check with `mandoc -Tlint man/*`; read one with `man ./man/arvio.1`.
 - `tests/`: pytest.
 
 ## Commands
@@ -34,6 +35,7 @@ CI (`.github/workflows/test.yml`) runs the same lint and tests on Python 3.11, 3
 - Before writing a file other processes also write (the registry), re-check its mtime and size, and refuse if it changed.
 - Tests run under pytest's temp folders with `ARVIO_DATA_DIR` set by an autouse fixture. Never point a test at `~/.arvio` or a real project's task folder.
 - The judge answer and `meta` never reach the page before the session's reveal. Any code that sends item data to the browser must build it from an allow-list of keys.
+- A change to a subcommand, flag, exit code or environment variable updates `man/arvio.1` in the same PR. A change to the file format updates `man/arvio-task.5` too.
 - A change to the file format updates `docs/format.md` in the same PR. A change that old files can't satisfy bumps `FORMAT` in `task.py`.
 - No project data in this repo: examples are made up.
 - The version lives only in `pyproject.toml`. There is no CHANGELOG. A release is a PR titled `chore: release X.Y.Z`, then an annotated tag `vX.Y.Z` on the merge commit, then a GitHub Release on that tag (`gh release create vX.Y.Z --verify-tag`) whose notes list what changed and link the PRs.
