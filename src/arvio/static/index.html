@@ -447,7 +447,7 @@ async function showInbox() {
   $app.focus({ preventScroll: true });
 }
 
-function unfinished(t) { return !t.problem && (t.waiting > 0 || t.labeled > t.revealed); }
+function unfinished(t) { return t.unfinished === true; }
 
 // Tasks with work left come first; the sort is stable, so the registry order holds within each group.
 function visibleTasks() {
