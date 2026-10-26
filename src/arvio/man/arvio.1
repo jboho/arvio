@@ -162,6 +162,65 @@ key, plus
 .B "locked": true
 once the judge's answers were shown for that item.
 Nothing is printed if the task has an error, so a script never reads a half-checked log.
+.TP
+.B arvio man \fR[\fBarvio\fR|\fBtask\fR]
+Show one of the manual pages that ship inside arvio.
+.B arvio
+(the default) is this page, and
+.B task
+is
+.BR arvio\-task (5).
+arvio runs
+.BR man (1)
+on the page's file and exits with its status.
+If
+.B man
+is not installed, arvio prints the path of the file and exits 1.
+.TP
+.B arvio man \-\-install \fR[\fB\-\-dir\fR \fIDIR\fR]
+Copy both pages, so that plain
+.B man arvio
+and
+.B man arvio\-task
+work.
+They go to
+.IR DIR/man1/arvio.1
+and
+.IR DIR/man5/arvio\-task.5 ,
+and arvio creates the folders if they are missing.
+Each path written is printed.
+Running it again overwrites the pages.
+If a path is a symbolic link, arvio replaces the link itself and leaves the file it pointed at alone.
+.RS
+.TP
+.BI \-\-dir " DIR"
+The man folder to copy into.
+The default is
+.IR $XDG_DATA_HOME/man
+if that variable is set, and
+.I ~/.local/share/man
+if not.
+Using
+.B \-\-dir
+without
+.B \-\-install
+is an error, and so is naming a page together with
+.BR \-\-install .
+.RE
+.IP
+.BR man (1)
+searches
+.I ~/.local/share/man
+only when that folder exists and
+.I ~/.local/bin
+is on your
+.BR PATH .
+This was checked on macOS only.
+Otherwise install with
+.BR \-\-dir ,
+and add that folder to
+.BR MANPATH .
+Run it again after you upgrade arvio, because the copies do not update themselves.
 .SH THE LABELING PAGE
 arvio starts a small web server for your inbox and opens the page in your browser.
 Stop it with Ctrl-C.
@@ -217,6 +276,14 @@ and
 the task was not in the inbox.
 .BR "arvio status"
 also exits 1 if any task it lists cannot be opened.
+For
+.BR "arvio man" ,
+status 1 also means that
+.B man
+is not installed, that a page could not be written, or that the options do not fit together.
+When
+.B man
+runs, its own exit status is passed through.
 .TP
 .B 2
 Only from
@@ -233,6 +300,14 @@ The default is
 .B ARVIO_LABELER
 The name written with each label.
 The default is your login name.
+.TP
+.B XDG_DATA_HOME
+Where
+.B "arvio man \-\-install"
+looks for its default folder: the pages go to
+.IR $XDG_DATA_HOME/man .
+If it is not set, they go to
+.IR ~/.local/share/man .
 .SH FILES
 .TP
 .I $ARVIO_DATA_DIR/tasks.json
@@ -258,6 +333,15 @@ Held by the running arvio, so only one runs per inbox.
 The task folder.
 See
 .BR arvio\-task (5).
+.TP
+.I MANDIR/man1/arvio.1
+.TQ
+.I MANDIR/man5/arvio\-task.5
+Written by
+.BR "arvio man \-\-install" ,
+where
+.I MANDIR
+is the man folder.
 .TP
 .I DIR/labels.jsonl.torn
 Where arvio moves a last line that was cut short, before its next append.

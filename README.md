@@ -65,6 +65,7 @@ arvio report my-task     # compare your labels with the judge; writes report.md 
 arvio labels my-task     # print the current label per item as JSON lines, for your own scripts
 arvio status             # what is waiting, and how long the next session takes (--archived lists the archived ones)
 arvio remove my-task     # take it off the inbox; its files stay
+arvio man                # read the manual; `arvio man --install` puts it where plain `man arvio` finds it
 ```
 
 To try it, copy `examples/hello` somewhere outside the repo and use the copy, since labeling writes into the task folder.
@@ -73,7 +74,7 @@ The page shows one item at a time. Press a choice's key, then Enter to save; ←
 
 `arvio report` exits 2 when the task card sets a pass rule (a gate) and the labels don't meet it yet, so a script can stop on it.
 
-From a clone, `man ./man/arvio.1` explains the command and `man ./man/arvio-task.5` the task folder format. An installed arvio doesn't put them on your `MANPATH`.
+`arvio man` shows the manual for the command, and `arvio man task` the one for the task folder format. To make plain `man arvio` and `man arvio-task` work, run `arvio man --install` once, and again after you upgrade arvio. It copies both pages into `~/.local/share/man` (or `$XDG_DATA_HOME/man`), which `man` searches when that folder exists and `~/.local/bin` is on your `PATH`. That search rule was checked on macOS only. On another system, or to use another folder, run `arvio man --install --dir DIR` and add `DIR` to your `MANPATH`.
 
 The inbox and the imported tasks live in `~/.arvio`. The page has an Active and an Archived tab, and each task has a button to move it between them. Set `ARVIO_DATA_DIR` to put it elsewhere, and `ARVIO_LABELER` to change the name written with each label (your login name by default).
 
