@@ -80,6 +80,21 @@ def import_task(source: Path, name: str | None = None) -> tuple[Task, bool]:
     return task, not existed
 
 
+def unfinished_reason(folder: Path) -> str | None:
+    """Why a task can't be archived yet, or None when it can.
+
+    A folder that is gone or fails its check has nothing left to finish, so it
+    may be archived (the way to put a dead entry away).
+    """
+    task, _ = check_task(folder)
+    if task is None or not task.unfinished():
+        return None
+    waiting = len(task.waiting())
+    if waiting:
+        return f"{waiting} items are still waiting for a label; finish them first"
+    return "labels are not locked yet; finish the session first"
+
+
 def resolve_registered(target: str) -> Path:
     """The registered task folder a path or a library name points at."""
     entries = read_registry()

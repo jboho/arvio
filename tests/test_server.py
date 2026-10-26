@@ -3,7 +3,7 @@ import json
 import threading
 
 import pytest
-from conftest import read_items, write_lines
+from conftest import finish_task, read_items, write_lines
 
 from arvio import server, store
 from arvio.task import load_task
@@ -281,6 +281,9 @@ def test_inbox_lists_the_task(client, folder):
 
 def test_archive_flag_round_trips_and_blocks_new_sessions(client, folder):
     path = f"/tasks/{tid(folder)}"
+    status, data = client.call("POST", path + "/archive", {"archived": True})
+    assert status == 409 and "still waiting" in data["error"]
+    finish_task(folder)
     assert client.ok("GET", "/inbox")["tasks"][0]["archived"] is False
     assert client.ok("POST", path + "/archive", {"archived": True}) == {
         "id": tid(folder),
@@ -293,7 +296,6 @@ def test_archive_flag_round_trips_and_blocks_new_sessions(client, folder):
         client.ok("POST", path + "/archive", {"archived": False})["archived"] is False
     )
     assert client.ok("GET", "/inbox")["tasks"][0]["archived"] is False
-    start(client, folder)
 
 
 def test_archive_route_checks_its_input(client, folder):

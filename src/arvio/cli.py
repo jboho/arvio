@@ -80,6 +80,9 @@ def _import_and_add(args: argparse.Namespace) -> int:
 def _move(args: argparse.Namespace, archived: bool) -> int:
     try:
         folder = library.resolve_registered(args.target)
+        reason = library.unfinished_reason(folder) if archived else None
+        if reason:
+            raise library.LibraryError(f"not archived: {reason}")
         changed = set_archived(folder, archived)
     except (library.LibraryError, StoreError, OSError) as e:
         print(f"arvio: {e}", file=sys.stderr)
