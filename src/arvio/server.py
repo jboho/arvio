@@ -225,7 +225,12 @@ class App:
         tasks = []
         for entry in entries:
             folder = Path(entry["dir"])
-            view = {"id": task_id(folder), "dir": str(folder), "name": folder.name}
+            view = {
+                "id": task_id(folder),
+                "dir": str(folder),
+                "name": folder.name,
+                "archived": entry.get("archived", False),
+            }
             if not folder.is_dir():
                 view["problem"] = "the folder is gone; run `arvio remove` on it"
             elif not self._lock(folder):
@@ -260,9 +265,35 @@ class App:
         task = self._task(tid)
         return {"id": tid, "card": card_view(task.card), "summary": task.summary()}
 
+    def archive(self, tid: str, body: dict) -> dict:
+        _no_unknown_keys(body, {"archived"})
+        archived = body.get("archived")
+        if not isinstance(archived, bool):
+            raise ApiError(400, "archived must be true or false")
+        self.refresh()
+        folder = self.folders.get(tid)
+        if folder is None:
+            raise ApiError(404, "no such task")
+        try:
+            found = store.set_archived(folder, archived)
+        except store.StoreError as e:
+            raise ApiError(409, str(e)) from None
+        if found is None:
+            raise ApiError(404, "no such task")
+        return {"id": tid, "archived": archived}
+
+    def _is_archived(self, tid: str) -> bool:
+        folder = self.folders.get(tid)
+        entries = store.read_registry() or []
+        return any(
+            t["dir"] == str(folder) and t.get("archived", False) for t in entries
+        )
+
     def start(self, tid: str, body: dict) -> dict:
         _no_unknown_keys(body, set())
         task = self._task(tid)
+        if self._is_archived(tid):
+            raise ApiError(409, "this task is archived; move it back to active first")
         waiting = sorted(
             task.waiting(), key=lambda i: order_key(task.card.version, i.id)
         )
@@ -521,6 +552,8 @@ class Handler(BaseHTTPRequestHandler):
                 return app.inbox()
             case "GET", ["", "tasks", tid]:
                 return app.task(tid)
+            case "POST", ["", "tasks", tid, "archive"]:
+                return app.archive(tid, body)
             case "POST", ["", "tasks", tid, "sessions"]:
                 return app.start(tid, body)
             case "POST", ["", "tasks", tid, "labels"]:

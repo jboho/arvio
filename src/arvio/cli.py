@@ -8,7 +8,13 @@ import sys
 from pathlib import Path
 
 from arvio import __version__, library, report, server
-from arvio.store import StoreError, read_registry, register, unregister
+from arvio.store import (
+    StoreError,
+    read_registry,
+    register,
+    set_archived,
+    unregister,
+)
 from arvio.task import Problem, check_task
 
 
@@ -71,17 +77,24 @@ def _import_and_add(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_archive(args: argparse.Namespace) -> int:
+def _move(args: argparse.Namespace, archived: bool) -> int:
     try:
-        target = library.archive_task(args.name)
-    except library.LibraryError as e:
+        folder = library.resolve_registered(args.target)
+        changed = set_archived(folder, archived)
+    except (library.LibraryError, StoreError, OSError) as e:
         print(f"arvio: {e}", file=sys.stderr)
         return 1
-    except (StoreError, OSError) as e:
-        print(f"arvio: {e}", file=sys.stderr)
-        return 1
-    print(f"archived: {target}")
+    where = "archived" if archived else "active"
+    print(f"{'moved to' if changed else 'already'} {where}: {folder}")
     return 0
+
+
+def cmd_archive(args: argparse.Namespace) -> int:
+    return _move(args, True)
+
+
+def cmd_unarchive(args: argparse.Namespace) -> int:
+    return _move(args, False)
 
 
 def cmd_remove(args: argparse.Namespace) -> int:
@@ -103,8 +116,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     if not tasks:
         print("No tasks yet. Add one with: arvio add DIR")
         return 0
+    shown = [t for t in tasks if t.get("archived", False) == args.archived]
+    hidden = len(tasks) - len(shown)
+    if not shown:
+        print("No archived tasks." if args.archived else "No active tasks.")
     broken = 0
-    for entry in tasks:
+    for entry in shown:
         task, problems = check_task(Path(entry["dir"]))
         if task is None:
             broken += 1
@@ -126,6 +143,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         if s["next_n"]:
             print(f"  next session: {s['next_n']} items, about {s['next_minutes']} min")
         print()
+    if hidden and args.archived:
+        print(f"{hidden} active; list them with: arvio status")
+    elif hidden:
+        print(f"{hidden} archived; list them with: arvio status --archived")
     return 1 if broken else 0
 
 
@@ -195,13 +216,18 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("remove", help="take a task folder off your inbox")
     p.add_argument("dir", type=Path, metavar="DIR")
     p.set_defaults(run=cmd_remove)
-    p = sub.add_parser(
-        "archive",
-        help="move a task from arvio's tasks folder to its archive, labels included",
-    )
-    p.add_argument("name", metavar="NAME")
+    p = sub.add_parser("archive", help="move a task to the archived list")
+    p.add_argument("target", metavar="NAME_OR_DIR")
     p.set_defaults(run=cmd_archive)
+    p = sub.add_parser(
+        "unarchive", help="move an archived task back to the active list"
+    )
+    p.add_argument("target", metavar="NAME_OR_DIR")
+    p.set_defaults(run=cmd_unarchive)
     p = sub.add_parser("status", help="show what is waiting in your inbox")
+    p.add_argument(
+        "--archived", action="store_true", help="list archived tasks instead"
+    )
     p.set_defaults(run=cmd_status)
     p = sub.add_parser("check", help="check a task folder; exits 1 on any error")
     p.add_argument("dir", type=Path, metavar="DIR")

@@ -1,4 +1,4 @@
-"""arvio's own copy of each task: import a project's folder, archive a finished one."""
+"""arvio's own copy of each task, and finding a registered task by name or path."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from arvio.store import atomic_write, data_dir, locked, unregister
+from arvio.store import atomic_write, data_dir, locked, read_registry
 from arvio.task import CARD_FILE, ITEMS_FILE, LABELS_FILE, Problem, Task, check_task
 
 NAME_RE = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
 
 
 class LibraryError(Exception):
-    """A task copy arvio refuses to make or move, with the reason."""
+    """A task copy or lookup arvio refuses, with the reason."""
 
     def __init__(self, message: str, problems: list[Problem] | None = None):
         super().__init__(message)
@@ -24,10 +24,6 @@ class LibraryError(Exception):
 
 def tasks_root() -> Path:
     return data_dir() / "tasks"
-
-
-def archive_root() -> Path:
-    return data_dir() / "archive"
 
 
 def _name(name: str) -> str:
@@ -52,8 +48,6 @@ def import_task(source: Path, name: str | None = None) -> tuple[Task, bool]:
         raise LibraryError("not imported: fix the errors above first", problems)
     name = _name(name if name is not None else source.name)
     root, dest = tasks_root(), tasks_root() / name
-    if (archive_root() / name).exists():
-        raise LibraryError(f"{name!r} is already in the archive; choose another --name")
     if source == dest.resolve():
         raise LibraryError("that folder is already arvio's copy; use arvio add")
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -86,17 +80,14 @@ def import_task(source: Path, name: str | None = None) -> tuple[Task, bool]:
     return task, not existed
 
 
-def archive_task(name: str) -> Path:
-    """Take a library task off the inbox and move it, labels and reports included."""
-    name = _name(name)
-    source = (tasks_root() / name).resolve()
-    if not source.is_dir():
-        raise LibraryError(f"no task named {name!r} in {tasks_root()}")
-    target = archive_root() / name
-    if target.exists():
-        raise LibraryError(f"{target} already exists; nothing moved")
-    archive_root().mkdir(mode=0o700, parents=True, exist_ok=True)
-    with locked(source, wait=False):
-        unregister(source)
-        os.rename(source, target)
-    return target
+def resolve_registered(target: str) -> Path:
+    """The registered task folder a path or a library name points at."""
+    entries = read_registry()
+    if entries is None:
+        raise LibraryError("the task registry can't be read; run `arvio status`")
+    known = {t["dir"] for t in entries}
+    for candidate in (Path(target).expanduser(), tasks_root() / target):
+        folder = candidate.resolve()
+        if str(folder) in known:
+            return folder
+    raise LibraryError(f"not in your inbox: {target}")

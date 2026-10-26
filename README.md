@@ -58,11 +58,12 @@ uv tool install git+https://github.com/jboho/arvio@v0.2.0
 arvio check my-task      # check a task folder; exits 1 and names the file and line on any error
 arvio add my-task        # check it and add it to your inbox
 arvio add --import my-task   # same, from a copy arvio keeps in ~/.arvio/tasks, so the labels outlive the project's checkout
-arvio archive my-task    # move that copy, labels included, to ~/.arvio/archive
+arvio archive my-task    # put a task away on the Archived tab; labels stay where they are
+arvio unarchive my-task  # move it back to the active list
 arvio                    # open the labeling page for your inbox
 arvio report my-task     # compare your labels with the judge; writes report.md and report.json
 arvio labels my-task     # print the current label per item as JSON lines, for your own scripts
-arvio status             # what is waiting, and how long the next session takes
+arvio status             # what is waiting, and how long the next session takes (--archived lists the archived ones)
 arvio remove my-task     # take it off the inbox; its files stay
 ```
 
@@ -72,7 +73,7 @@ The page shows one item at a time. Press a choice's key, then Enter to save; ←
 
 `arvio report` exits 2 when the task card sets a pass rule (a gate) and the labels don't meet it yet, so a script can stop on it.
 
-The inbox, the imported tasks and the archive live in `~/.arvio`. Set `ARVIO_DATA_DIR` to put it elsewhere, and `ARVIO_LABELER` to change the name written with each label (your login name by default).
+The inbox and the imported tasks live in `~/.arvio`. The page has an Active and an Archived tab, and each task has a button to move it between them. Set `ARVIO_DATA_DIR` to put it elsewhere, and `ARVIO_LABELER` to change the name written with each label (your login name by default).
 
 ## Known gaps
 

@@ -279,6 +279,32 @@ def test_inbox_lists_the_task(client, folder):
     assert "problem" not in t
 
 
+def test_archive_flag_round_trips_and_blocks_new_sessions(client, folder):
+    path = f"/tasks/{tid(folder)}"
+    assert client.ok("GET", "/inbox")["tasks"][0]["archived"] is False
+    assert client.ok("POST", path + "/archive", {"archived": True}) == {
+        "id": tid(folder),
+        "archived": True,
+    }
+    assert client.ok("GET", "/inbox")["tasks"][0]["archived"] is True
+    status, data = client.call("POST", path + "/sessions")
+    assert status == 409 and "archived" in data["error"]
+    assert (
+        client.ok("POST", path + "/archive", {"archived": False})["archived"] is False
+    )
+    assert client.ok("GET", "/inbox")["tasks"][0]["archived"] is False
+    start(client, folder)
+
+
+def test_archive_route_checks_its_input(client, folder):
+    path = f"/tasks/{tid(folder)}/archive"
+    assert client.call("POST", path, {})[0] == 400
+    assert client.call("POST", path, {"archived": "yes"})[0] == 400
+    assert client.call("POST", path, {"archived": True, "extra": 1})[0] == 400
+    assert client.call("POST", "/tasks/nope/archive", {"archived": True})[0] == 404
+    assert client.ok("GET", "/inbox")["tasks"][0]["archived"] is False
+
+
 def test_the_page_knows_whether_the_task_has_a_judge(client, folder):
     path = f"/tasks/{tid(folder)}"
     assert client.ok("GET", "/inbox")["tasks"][0]["has_judge"] is True

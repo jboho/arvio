@@ -387,6 +387,7 @@ function fatal(err) {
 
 let screen = "loading";
 let inbox = [];
+let inboxView = "active"; // "active" or "archived"
 let S = null; // the session in progress
 
 // Time counts only while the page is visible.
@@ -423,29 +424,55 @@ async function showInbox() {
   try { data = await api("GET", "/inbox"); } catch (err) { fatal(err); return; }
   inbox = data.tasks;
   screen = "inbox";
-  const waiting = inbox.reduce((n, t) => n + (t.waiting || 0), 0);
+  const shown = visibleTasks();
+  const archivedCount = inbox.filter((t) => t.archived).length;
+  const waiting = shown.reduce((n, t) => n + (t.waiting || 0), 0);
+  const active = inboxView === "active";
+  const empty = !inbox.length
+    ? "No tasks. Add one in your terminal with: arvio add DIR"
+    : active ? "Nothing is active. Your archived tasks are on the Archived tab."
+      : "Nothing is archived. Archive a task to put it away; you can move it back any time.";
   $app.replaceChildren(
-    h("div", { class: "intro" }, h("h1", {}, "Inbox"),
-      h("p", { class: "sub" }, `${plural(waiting, "item")} waiting in ${plural(inbox.length, "task")}`)),
-    inbox.length
-      ? h("div", { class: "grid" }, inbox.map(taskPanel))
-      : h("p", { class: "sub" }, "No tasks. Add one in your terminal with: arvio add DIR"));
+    h("div", { class: "intro" }, h("h1", {}, active ? "Inbox" : "Archived"),
+      h("p", { class: "sub" }, active
+        ? `${plural(waiting, "item")} waiting in ${plural(shown.length, "task")}`
+        : plural(shown.length, "archived task"))),
+    inbox.length > 0 && h("div", { class: "actions" },
+      button(`Active ${inbox.length - archivedCount}`, () => switchView("active"), { primary: active, small: true }),
+      button(`Archived ${archivedCount}`, () => switchView("archived"), { primary: !active, small: true })),
+    shown.length
+      ? h("div", { class: "grid" }, shown.map(taskPanel))
+      : h("p", { class: "sub" }, empty));
   $app.focus({ preventScroll: true });
 }
 
-function startable(t) { return !t.problem && (t.waiting > 0 || t.labeled > t.revealed); }
+function visibleTasks() { return inbox.filter((t) => !!t.archived === (inboxView === "archived")); }
+
+function switchView(view) { inboxView = view; showInbox(); }
+
+async function setArchived(tid, archived) {
+  try { await api("POST", `/tasks/${encodeURIComponent(tid)}/archive`, { archived }); } catch (err) { fatal(err); return; }
+  showInbox();
+}
+
+function moveButton(t) {
+  return button(t.archived ? "Move to active" : "Archive", () => setArchived(t.id, !t.archived), { small: true });
+}
+
+function startable(t) { return !t.archived && !t.problem && (t.waiting > 0 || t.labeled > t.revealed); }
 
 function taskPanel(t, n) {
   if (t.problem) {
     return panel({ title: t.name },
       h("p", { class: "problem" }, t.problem),
-      h("p", { class: "facts" }, t.dir));
+      h("p", { class: "facts" }, t.dir),
+      h("div", { class: "actions" }, h("span", { class: "grow" }), moveButton(t)));
   }
   const unrevealed = t.labeled - t.revealed;
   const facts = [plural(t.items, "item"), `${t.labeled} labeled`];
   if (t.last_at) facts.push(`last ${t.last_at.slice(0, 10)}`);
   const key = n < 9 ? String(n + 1) : null;
-  return panel({ title: t.name, count: t.waiting, accentCount: t.waiting > 0, right: key && startable(t) && `key ${key}` },
+  return panel({ title: t.name, count: t.waiting, accentCount: t.waiting > 0 && !t.archived, right: key && startable(t) && `key ${key}` },
     h("h2", {}, t.title),
     t.purpose && h("p", { class: "sub" }, t.purpose),
     h("p", { class: "facts" }, facts.join(" · ")),
@@ -454,10 +481,11 @@ function taskPanel(t, n) {
       ? `${plural(unrevealed, "label")} not compared with the judge yet. Finish a session to see them.`
       : `${plural(unrevealed, "label")} not locked yet. Finish a session to lock them.`),
     h("div", { class: "actions" },
-      t.waiting > 0
+      !t.archived && (t.waiting > 0
         ? h("span", { class: "hint" }, `Next: ${plural(t.next_n, "item")}, about ${t.next_minutes} min`)
-        : h("span", { class: "hint" }, "All labeled"),
+        : h("span", { class: "hint" }, "All labeled")),
       h("span", { class: "grow" }),
+      moveButton(t),
       startable(t) && button(t.waiting > 0 ? "Start" : "Finish", () => showCard(t.id), { primary: true })));
 }
 
@@ -906,10 +934,11 @@ function showResults(r) {
 
 const keys = {
   inbox(k) {
-    const startableTasks = inbox.filter(startable);
+    const shown = visibleTasks();
+    const startableTasks = shown.filter(startable);
     if (k === "Enter" && startableTasks.length) { showCard(startableTasks[0].id); return true; }
     if (/^[1-9]$/.test(k)) {
-      const t = inbox[Number(k) - 1];
+      const t = shown[Number(k) - 1];
       if (t && startable(t)) { showCard(t.id); return true; }
     }
     return false;

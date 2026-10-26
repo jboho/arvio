@@ -95,52 +95,19 @@ def test_import_refuses_the_library_copy_itself(task_dir, data_dir, capsys):
     assert "already arvio's copy" in capsys.readouterr().err
 
 
-def test_archive_moves_the_task_with_its_labels_and_leaves_the_inbox(
-    task_dir, data_dir, capsys
-):
+def test_resolve_finds_a_library_name_or_a_path(task_dir, data_dir):
     main(["add", "--import", str(task_dir), "--name", "mine"])
-    copy = data_dir / "tasks" / "mine"
-    write_lines(copy / "labels.jsonl", [label_row(load_task(copy))])
-    assert main(["archive", "mine"]) == 0
-    assert not copy.exists()
-    assert (data_dir / "archive" / "mine" / "labels.jsonl").is_file()
-    assert registered() == []
-    assert str(data_dir / "archive" / "mine") in capsys.readouterr().out
+    copy = (data_dir / "tasks" / "mine").resolve()
+    assert library.resolve_registered("mine") == copy
+    assert library.resolve_registered(str(copy)) == copy
 
 
-def test_archive_refuses_a_name_that_is_not_in_the_library(task_dir, data_dir, capsys):
-    main(["add", str(task_dir)])
-    assert main(["archive", "task"]) == 1
-    assert "no task named" in capsys.readouterr().err
-    assert task_dir.is_dir()
-    assert registered() == [str(task_dir)]
-
-
-def test_archive_refuses_to_overwrite(task_dir, data_dir, capsys):
-    main(["add", "--import", str(task_dir), "--name", "mine"])
-    (data_dir / "archive" / "mine").mkdir(parents=True)
-    assert main(["archive", "mine"]) == 1
-    assert "already exists" in capsys.readouterr().err
-    assert (data_dir / "tasks" / "mine").is_dir()
-    assert len(registered()) == 1
-
-
-def test_archive_refuses_while_the_page_has_the_folder_open(task_dir, data_dir, capsys):
-    main(["add", "--import", str(task_dir), "--name", "mine"])
-    copy = data_dir / "tasks" / "mine"
-    with locked(copy):
-        assert main(["archive", "mine"]) == 1
-    assert "in use by another arvio" in capsys.readouterr().err
-    assert copy.is_dir()
-    assert len(registered()) == 1
-
-
-def test_import_refuses_a_name_already_in_the_archive(task_dir, data_dir, capsys):
-    main(["add", "--import", str(task_dir), "--name", "mine"])
-    main(["archive", "mine"])
-    capsys.readouterr()
-    assert main(["add", "--import", str(task_dir), "--name", "mine"]) == 1
-    assert "already in the archive" in capsys.readouterr().err
+def test_resolve_refuses_what_is_not_registered(task_dir, data_dir):
+    with pytest.raises(library.LibraryError, match="not in your inbox"):
+        library.resolve_registered(str(task_dir))
+    (data_dir / "tasks" / "loose").mkdir(parents=True)
+    with pytest.raises(library.LibraryError, match="not in your inbox"):
+        library.resolve_registered("loose")
 
 
 def test_library_error_carries_problems(task_dir):
@@ -148,3 +115,19 @@ def test_library_error_carries_problems(task_dir):
     with pytest.raises(library.LibraryError) as e:
         library.import_task(task_dir, "mine")
     assert e.value.problems
+
+
+def test_import_again_refuses_while_the_page_has_the_folder_open(
+    task_dir, data_dir, capsys
+):
+    main(["add", "--import", str(task_dir), "--name", "mine"])
+    before = (data_dir / "tasks" / "mine" / "items.jsonl").read_text(encoding="utf-8")
+    rows = read_items(task_dir)
+    rows[5]["meta"] = {"note": "changed upstream"}
+    write_lines(task_dir / "items.jsonl", rows)
+    capsys.readouterr()
+    with locked(data_dir / "tasks" / "mine"):
+        assert main(["add", "--import", str(task_dir), "--name", "mine"]) == 1
+    assert "in use by another arvio" in capsys.readouterr().err
+    after = (data_dir / "tasks" / "mine" / "items.jsonl").read_text(encoding="utf-8")
+    assert after == before
