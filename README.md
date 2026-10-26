@@ -73,6 +73,8 @@ The page shows one item at a time. Press a choice's key, then Enter to save; ←
 
 `arvio report` exits 2 when the task card sets a pass rule (a gate) and the labels don't meet it yet, so a script can stop on it.
 
+From a clone, `man ./man/arvio.1` explains the command and `man ./man/arvio-task.5` the task folder format. An installed arvio doesn't put them on your `MANPATH`.
+
 The inbox and the imported tasks live in `~/.arvio`. The page has an Active and an Archived tab, and each task has a button to move it between them. Set `ARVIO_DATA_DIR` to put it elsewhere, and `ARVIO_LABELER` to change the name written with each label (your login name by default).
 
 ## Known gaps
