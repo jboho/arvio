@@ -7,8 +7,14 @@ import json
 import sys
 from pathlib import Path
 
-from arvio import __version__, report, server
-from arvio.store import StoreError, read_registry, register, unregister
+from arvio import __version__, library, report, server
+from arvio.store import (
+    StoreError,
+    read_registry,
+    register,
+    set_archived,
+    unregister,
+)
 from arvio.task import Problem, check_task
 
 
@@ -35,6 +41,11 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_add(args: argparse.Namespace) -> int:
+    if args.name and not args.import_:
+        print("arvio: --name needs --import", file=sys.stderr)
+        return 1
+    if args.import_:
+        return _import_and_add(args)
     task, problems = check_task(args.dir)
     _print_problems(problems)
     if task is None:
@@ -48,6 +59,42 @@ def cmd_add(args: argparse.Namespace) -> int:
     state = "added" if added else "already in your inbox"
     print(f"{state}: {task.card.title} ({len(task.waiting())} waiting)")
     return 0
+
+
+def _import_and_add(args: argparse.Namespace) -> int:
+    try:
+        task, created = library.import_task(args.dir, args.name)
+        register(task.dir)
+    except library.LibraryError as e:
+        _print_problems(e.problems)
+        print(f"arvio: {e}", file=sys.stderr)
+        return 1
+    except (StoreError, OSError) as e:
+        print(f"arvio: {e}", file=sys.stderr)
+        return 1
+    state = "imported" if created else "updated"
+    print(f"{state}: {task.card.title} ({len(task.waiting())} waiting)\n  {task.dir}")
+    return 0
+
+
+def _move(args: argparse.Namespace, archived: bool) -> int:
+    try:
+        folder = library.resolve_registered(args.target)
+        changed = set_archived(folder, archived)
+    except (library.LibraryError, StoreError, OSError) as e:
+        print(f"arvio: {e}", file=sys.stderr)
+        return 1
+    where = "archived" if archived else "active"
+    print(f"{'moved to' if changed else 'already'} {where}: {folder}")
+    return 0
+
+
+def cmd_archive(args: argparse.Namespace) -> int:
+    return _move(args, True)
+
+
+def cmd_unarchive(args: argparse.Namespace) -> int:
+    return _move(args, False)
 
 
 def cmd_remove(args: argparse.Namespace) -> int:
@@ -69,8 +116,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     if not tasks:
         print("No tasks yet. Add one with: arvio add DIR")
         return 0
+    shown = [t for t in tasks if t.get("archived", False) == args.archived]
+    hidden = len(tasks) - len(shown)
+    if not shown:
+        print("No archived tasks." if args.archived else "No active tasks.")
     broken = 0
-    for entry in tasks:
+    for entry in shown:
         task, problems = check_task(Path(entry["dir"]))
         if task is None:
             broken += 1
@@ -92,6 +143,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         if s["next_n"]:
             print(f"  next session: {s['next_n']} items, about {s['next_minutes']} min")
         print()
+    if hidden and args.archived:
+        print(f"{hidden} active; list them with: arvio status")
+    elif hidden:
+        print(f"{hidden} archived; list them with: arvio status --archived")
     return 1 if broken else 0
 
 
@@ -148,11 +203,31 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
     p = sub.add_parser("add", help="check a task folder and add it to your inbox")
     p.add_argument("dir", type=Path, metavar="DIR")
+    p.add_argument(
+        "--import",
+        dest="import_",
+        action="store_true",
+        help="copy the card and items into arvio's own tasks folder and add that copy",
+    )
+    p.add_argument(
+        "--name", metavar="NAME", help="the copy's folder name (with --import)"
+    )
     p.set_defaults(run=cmd_add)
     p = sub.add_parser("remove", help="take a task folder off your inbox")
     p.add_argument("dir", type=Path, metavar="DIR")
     p.set_defaults(run=cmd_remove)
+    p = sub.add_parser("archive", help="move a task to the archived list")
+    p.add_argument("target", metavar="NAME_OR_DIR")
+    p.set_defaults(run=cmd_archive)
+    p = sub.add_parser(
+        "unarchive", help="move an archived task back to the active list"
+    )
+    p.add_argument("target", metavar="NAME_OR_DIR")
+    p.set_defaults(run=cmd_unarchive)
     p = sub.add_parser("status", help="show what is waiting in your inbox")
+    p.add_argument(
+        "--archived", action="store_true", help="list archived tasks instead"
+    )
     p.set_defaults(run=cmd_status)
     p = sub.add_parser("check", help="check a task folder; exits 1 on any error")
     p.add_argument("dir", type=Path, metavar="DIR")

@@ -72,6 +72,26 @@ def test_unregister(tmp_path):
     assert store.read_registry() == []
 
 
+def test_set_archived_toggles_and_reports_what_changed(tmp_path):
+    store.register(tmp_path / "one")
+    store.register(tmp_path / "two")
+    assert store.set_archived(tmp_path / "one", True) is True
+    assert store.set_archived(tmp_path / "one", True) is False
+    assert store.set_archived(tmp_path / "nope", True) is None
+    tasks = store.read_registry()
+    assert tasks[0]["archived"] is True and "archived" not in tasks[1]
+    assert store.set_archived(tmp_path / "one", False) is True
+    assert store.set_archived(tmp_path / "one", False) is False
+    assert "archived" not in store.read_registry()[0]
+
+
+def test_a_registry_with_a_non_boolean_archived_reads_as_none(data_dir):
+    data_dir.mkdir()
+    bad = {"format": 1, "tasks": [{"dir": "/x", "archived": "yes"}]}
+    (data_dir / "tasks.json").write_text(json.dumps(bad), encoding="utf-8")
+    assert store.read_registry() is None
+
+
 def test_missing_registry_is_empty_and_corrupt_registry_is_none(data_dir):
     assert store.read_registry() == []
     data_dir.mkdir()

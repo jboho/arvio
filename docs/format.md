@@ -146,6 +146,10 @@ A last line with no newline that doesn't parse is a write that was cut short (or
 
 `arvio add DIR` checks a task folder and records its absolute path in `$ARVIO_DATA_DIR/tasks.json` (default `~/.arvio`). `arvio remove DIR` takes it off; the task's files stay. The registry holds paths only, never items or labels.
 
+`arvio add --import DIR [--name NAME]` is the same, but arvio first copies `task.toml` and `items.jsonl` into its own folder, `$ARVIO_DATA_DIR/tasks/NAME` (NAME is the folder's name unless you pass `--name`; 1-64 of `a-z 0-9 . _ -`, starting with a letter or digit), and adds that copy. Labels are written there, so they no longer depend on the project's checkout. The project's `labels.jsonl` is never copied. Running the import again replaces the card and items and keeps the labels; it is refused, and nothing changes, if the labels would then name an item that is gone, or if a page has the folder open.
+
+Each registry entry can carry `"archived": true`. `arvio archive TARGET` sets it and `arvio unarchive TARGET` removes it; TARGET is a registered folder's path or a library name. The folder itself never moves, so labels and reports stay where they are, and a page that has the folder open is not affected. An archived task is hidden from the page's Active tab and from `arvio status`, and appears on the Archived tab and under `arvio status --archived`. A page can't start a session on an archived task until it is moved back.
+
 ## The labeling page
 
 `arvio` with no command starts a small web server for your inbox and opens the page in your browser (`--no-browser` prints the link instead). Stop it with Ctrl-C. With an empty inbox it prints how to add a task and exits.

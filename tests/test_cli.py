@@ -217,3 +217,39 @@ def test_labels_fails_closed(task_dir, capsys):
     out = capsys.readouterr()
     assert out.out == ""
     assert "labels.jsonl:2" in out.err and "no labels" in out.err
+
+
+def test_archive_and_unarchive_move_a_task_between_the_lists(
+    task_dir, data_dir, capsys
+):
+    main(["add", str(task_dir)])
+    capsys.readouterr()
+    assert main(["archive", str(task_dir)]) == 0
+    assert capsys.readouterr().out.startswith("moved to archived: ")
+    assert main(["archive", str(task_dir)]) == 0
+    assert capsys.readouterr().out.startswith("already archived: ")
+    assert main(["status"]) == 0
+    out = capsys.readouterr().out
+    assert "No active tasks." in out and "1 archived; list them with" in out
+    assert main(["status", "--archived"]) == 0
+    out = capsys.readouterr().out
+    assert "waiting 12, labeled 0" in out
+    assert main(["unarchive", str(task_dir)]) == 0
+    assert capsys.readouterr().out.startswith("moved to active: ")
+    assert main(["status"]) == 0
+    assert "waiting 12, labeled 0" in capsys.readouterr().out
+    assert (task_dir / "task.toml").is_file()
+
+
+def test_archive_refuses_a_task_that_is_not_in_the_inbox(task_dir, capsys):
+    assert main(["archive", str(task_dir)]) == 1
+    assert "not in your inbox" in capsys.readouterr().err
+
+
+def test_serving_still_works_when_every_task_is_archived(task_dir, monkeypatch):
+    calls = []
+    monkeypatch.setattr(server, "run", lambda **kw: calls.append(kw) or 0)
+    main(["add", str(task_dir)])
+    main(["archive", str(task_dir)])
+    assert main(["--no-browser"]) == 0
+    assert calls == [{"open_browser": False}]

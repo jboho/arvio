@@ -154,7 +154,10 @@ def read_registry() -> list[dict] | None:
         return None
     tasks = data.get("tasks")
     if not isinstance(tasks, list) or not all(
-        isinstance(t, dict) and isinstance(t.get("dir"), str) for t in tasks
+        isinstance(t, dict)
+        and isinstance(t.get("dir"), str)
+        and isinstance(t.get("archived", False), bool)
+        for t in tasks
     ):
         return None
     return tasks
@@ -211,3 +214,28 @@ def unregister(folder: Path) -> bool:
 
     update_registry(change)
     return removed
+
+
+def set_archived(folder: Path, archived: bool) -> bool | None:
+    """Move a task between the active and archived lists.
+
+    None if the folder isn't registered; False if it was already there.
+    """
+    key = str(folder)
+    found = changed = False
+
+    def change(tasks: list[dict]) -> list[dict]:
+        nonlocal found, changed
+        out = []
+        for t in tasks:
+            if t["dir"] == key:
+                found = True
+                changed = t.get("archived", False) != archived
+                t = {k: v for k, v in t.items() if k != "archived"}
+                if archived:
+                    t["archived"] = True
+            out.append(t)
+        return out
+
+    update_registry(change)
+    return changed if found else None
