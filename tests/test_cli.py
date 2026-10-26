@@ -1,5 +1,7 @@
 import json
 import shutil
+import subprocess
+from importlib import resources
 
 import pytest
 from conftest import finish_task, read_items, write_lines
@@ -278,3 +280,106 @@ def test_serving_still_works_when_every_task_is_archived(task_dir, monkeypatch):
     assert main(["archive", str(task_dir)]) == 0
     assert main(["--no-browser"]) == 0
     assert calls == [{"open_browser": False}]
+
+
+PAGE_FILES = {"man1/arvio.1": "arvio.1", "man5/arvio-task.5": "arvio-task.5"}
+
+
+def packaged(filename):
+    return (resources.files("arvio") / "man" / filename).read_text(encoding="utf-8")
+
+
+def test_the_man_pages_ship_inside_the_package():
+    for filename in PAGE_FILES.values():
+        assert packaged(filename).startswith(".TH ")
+
+
+def test_man_install_writes_both_pages_and_prints_their_paths(tmp_path, capsys):
+    dest = tmp_path / "share" / "man"
+    assert main(["man", "--install", "--dir", str(dest)]) == 0
+    for where, filename in PAGE_FILES.items():
+        assert (dest / where).read_text(encoding="utf-8") == packaged(filename)
+    assert capsys.readouterr().out.splitlines() == [
+        str(dest / where) for where in PAGE_FILES
+    ]
+
+
+def test_man_install_again_overwrites_the_pages(tmp_path):
+    dest = tmp_path / "man"
+    main(["man", "--install", "--dir", str(dest)])
+    (dest / "man1" / "arvio.1").write_text("stale", encoding="utf-8")
+    assert main(["man", "--install", "--dir", str(dest)]) == 0
+    assert (dest / "man1" / "arvio.1").read_text(encoding="utf-8") == packaged(
+        "arvio.1"
+    )
+
+
+def test_man_install_replaces_a_symlink_and_leaves_its_target(tmp_path):
+    dest = tmp_path / "man"
+    (dest / "man1").mkdir(parents=True)
+    target = tmp_path / "clone-copy.1"
+    target.write_text("the clone's page", encoding="utf-8")
+    link = dest / "man1" / "arvio.1"
+    link.symlink_to(target)
+    assert main(["man", "--install", "--dir", str(dest)]) == 0
+    assert not link.is_symlink()
+    assert link.read_text(encoding="utf-8") == packaged("arvio.1")
+    assert target.read_text(encoding="utf-8") == "the clone's page"
+
+
+def test_man_install_defaults_to_xdg_data_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+    assert main(["man", "--install"]) == 0
+    assert (tmp_path / "xdg" / "man" / "man1" / "arvio.1").is_file()
+
+
+def test_man_install_defaults_to_local_share_under_home(tmp_path, monkeypatch):
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    assert main(["man", "--install"]) == 0
+    page = tmp_path / "home" / ".local" / "share" / "man" / "man5" / "arvio-task.5"
+    assert page.is_file()
+
+
+def test_man_install_reports_a_folder_it_cannot_create(tmp_path, capsys):
+    blocker = tmp_path / "file"
+    blocker.write_text("", encoding="utf-8")
+    assert main(["man", "--install", "--dir", str(blocker / "man")]) == 1
+    assert capsys.readouterr().err.startswith("arvio: ")
+
+
+def test_man_dir_without_install_is_an_error(tmp_path, capsys):
+    assert main(["man", "--dir", str(tmp_path)]) == 1
+    assert "--dir needs --install" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_man_install_with_a_page_is_an_error(tmp_path, capsys):
+    assert main(["man", "task", "--install", "--dir", str(tmp_path / "m")]) == 1
+    assert "leave PAGE out" in capsys.readouterr().err
+    assert not (tmp_path / "m").exists()
+
+
+def test_man_shows_the_packaged_page_and_passes_the_status_through(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 3)
+
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/man")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert main(["man"]) == 3
+    assert main(["man", "task"]) == 3
+    assert [(c[0], c[1].rsplit("/", 1)[1]) for c in calls] == [
+        ("man", "arvio.1"),
+        ("man", "arvio-task.5"),
+    ]
+
+
+def test_man_without_a_man_command_prints_the_path(monkeypatch, capsys):
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: pytest.fail("ran man"))
+    assert main(["man", "task"]) == 1
+    out = capsys.readouterr().out.splitlines()
+    assert out[-1].endswith("/arvio/man/arvio-task.5")

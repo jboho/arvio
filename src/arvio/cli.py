@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
+import subprocess
 import sys
+from importlib import resources
 from pathlib import Path
 
 from arvio import __version__, library, report, server
 from arvio.store import (
     StoreError,
+    atomic_write,
     read_registry,
     register,
     set_archived,
@@ -189,6 +194,61 @@ def cmd_labels(args: argparse.Namespace) -> int:
     return 0
 
 
+# PAGE -> (file in src/arvio/man, the man section folder it installs into)
+MAN_PAGES = {
+    "arvio": ("arvio.1", "man1"),
+    "task": ("arvio-task.5", "man5"),
+}
+
+
+def _man_source(filename: str):
+    return resources.files("arvio") / "man" / filename
+
+
+def _default_man_dir() -> Path:
+    data_home = os.environ.get("XDG_DATA_HOME")
+    base = Path(data_home) if data_home else Path.home() / ".local" / "share"
+    return base / "man"
+
+
+def _show_man(page: str) -> int:
+    filename, _ = MAN_PAGES[page]
+    with resources.as_file(_man_source(filename)) as path:
+        if shutil.which("man") is None:
+            print("arvio: the man command is not installed; the page is this file:")
+            print(path)
+            return 1
+        return subprocess.run(["man", str(path)]).returncode
+
+
+def _install_man(dest: Path) -> int:
+    for filename, section in MAN_PAGES.values():
+        target = dest / section / filename
+        try:
+            text = _man_source(filename).read_text(encoding="utf-8")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            # atomic_write renames over the path, so a symlink there is replaced
+            # and whatever it pointed at is left alone.
+            atomic_write(target, text)
+        except OSError as e:
+            print(f"arvio: {e}", file=sys.stderr)
+            return 1
+        print(target)
+    return 0
+
+
+def cmd_man(args: argparse.Namespace) -> int:
+    if args.dir and not args.install:
+        print("arvio: --dir needs --install", file=sys.stderr)
+        return 1
+    if not args.install:
+        return _show_man(args.page or "arvio")
+    if args.page:
+        print("arvio: --install copies both pages; leave PAGE out", file=sys.stderr)
+        return 1
+    return _install_man((args.dir or _default_man_dir()).expanduser())
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="arvio",
@@ -249,6 +309,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("dir", type=Path, metavar="DIR")
     p.set_defaults(run=cmd_labels)
+    p = sub.add_parser(
+        "man", help="show arvio's man pages, or copy them where man looks"
+    )
+    p.add_argument(
+        "page",
+        nargs="?",
+        choices=list(MAN_PAGES),
+        help="arvio (the command, the default) or task (the task folder format)",
+    )
+    p.add_argument(
+        "--install",
+        action="store_true",
+        help="copy both pages into a man folder, so plain `man arvio` works",
+    )
+    p.add_argument(
+        "--dir",
+        type=Path,
+        metavar="DIR",
+        help="the man folder to copy into (with --install); default ~/.local/share/man",
+    )
+    p.set_defaults(run=cmd_man)
     return parser
 
 
