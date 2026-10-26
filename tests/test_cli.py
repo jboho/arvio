@@ -1,13 +1,15 @@
 import json
+import re
 import shutil
 import subprocess
 from importlib import resources
+from pathlib import Path
 
 import pytest
 from conftest import finish_task, read_items, write_lines
 
 from arvio import server
-from arvio.cli import main
+from arvio.cli import GUIDE_URL, main
 from arvio.store import read_registry
 from arvio.task import load_task
 
@@ -15,7 +17,9 @@ from arvio.task import load_task
 def test_no_command_with_an_empty_inbox_says_how_to_add(capsys, monkeypatch):
     monkeypatch.setattr(server, "run", lambda **kw: pytest.fail("served"))
     assert main([]) == 0
-    assert "Add one with: arvio add DIR" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Add one with: arvio add DIR" in out
+    assert f"guide: {GUIDE_URL}" in out
 
 
 def test_no_command_serves_the_inbox(task_dir, monkeypatch):
@@ -48,6 +52,7 @@ def test_check_fails_closed_with_file_and_line(task_dir, capsys):
     out = capsys.readouterr()
     assert f"{task_dir / 'items.jsonl'}:4: error: display 1 kind" in out.err
     assert "1 error;" in out.out
+    assert f"guide: {GUIDE_URL}" in out.out
 
 
 def test_check_on_a_missing_folder(tmp_path, capsys):
@@ -113,7 +118,9 @@ def test_status_without_a_judge_counts_locked_labels(task_dir, capsys):
 def test_add_refuses_a_broken_task(task_dir, data_dir, capsys):
     (task_dir / "task.toml").write_text('format = 1\ntitle = "x"\n', encoding="utf-8")
     assert main(["add", str(task_dir)]) == 1
-    assert "not added" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "not added" in out
+    assert f"guide: {GUIDE_URL}" in out
     assert not (data_dir / "tasks.json").exists()
 
 
@@ -129,7 +136,9 @@ def test_status_flags_a_task_that_broke_after_adding(task_dir, capsys):
 
 def test_status_with_an_empty_inbox(capsys):
     assert main(["status"]) == 0
-    assert "No tasks yet" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "No tasks yet" in out
+    assert f"guide: {GUIDE_URL}" in out
 
 
 def test_add_reports_a_data_folder_it_cannot_write(
@@ -383,3 +392,14 @@ def test_man_without_a_man_command_prints_the_path(monkeypatch, capsys):
     assert main(["man", "task"]) == 1
     out = capsys.readouterr().out.splitlines()
     assert out[-1].endswith("/arvio/man/arvio-task.5")
+
+
+def test_the_guide_link_points_at_the_guide_and_its_troubleshooting():
+    root = Path(__file__).resolve().parent.parent
+    assert GUIDE_URL.endswith("/blob/main/docs/add-a-task.md")
+    guide = (root / "docs" / "add-a-task.md").read_text(encoding="utf-8")
+    assert "\n## If something goes wrong\n" in guide
+    page = (root / "src" / "arvio" / "static" / "index.html").read_text("utf-8")
+    assert f'const GUIDE = "{GUIDE_URL}";' in page
+    assert '"#if-something-goes-wrong"' in page
+    assert len(re.findall(r"^### Step \d", guide, re.M)) <= 5

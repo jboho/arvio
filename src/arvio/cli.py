@@ -22,6 +22,12 @@ from arvio.store import (
 )
 from arvio.task import Problem, check_task
 
+GUIDE_URL = "https://github.com/jboho/arvio/blob/main/docs/add-a-task.md"
+
+
+def _print_guide(file=None) -> None:
+    print(f"guide: {GUIDE_URL}", file=file or sys.stdout)
+
 
 def _print_problems(problems: list[Problem]) -> None:
     for p in problems:
@@ -36,6 +42,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(
             f"{errors} error{'s' if errors != 1 else ''}; fix them and run check again"
         )
+        _print_guide()
         return 1
     s = task.summary()
     print(
@@ -55,6 +62,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     _print_problems(problems)
     if task is None:
         print("not added: fix the errors above first")
+        _print_guide()
         return 1
     try:
         added = register(task.dir)
@@ -73,6 +81,7 @@ def _import_and_add(args: argparse.Namespace) -> int:
     except library.LibraryError as e:
         _print_problems(e.problems)
         print(f"arvio: {e}", file=sys.stderr)
+        _print_guide(sys.stderr)
         return 1
     except (StoreError, OSError) as e:
         print(f"arvio: {e}", file=sys.stderr)
@@ -123,6 +132,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         return 1
     if not tasks:
         print("No tasks yet. Add one with: arvio add DIR")
+        _print_guide()
         return 0
     shown = [t for t in tasks if t.get("archived", False) == args.archived]
     hidden = len(tasks) - len(shown)
@@ -340,6 +350,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
         return 1
     if not tasks:
         print("No tasks yet. Add one with: arvio add DIR")
+        _print_guide()
         return 0
     return server.run(open_browser=not args.no_browser)
 

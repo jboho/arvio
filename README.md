@@ -29,6 +29,7 @@
 | ------------ | ------------------------------------------------------------------------------------------ |
 | **License**  | [MIT](LICENSE); the page's fonts are under [OFL-1.1](src/arvio/static/fonts/OFL.txt)       |
 | **Format**   | [Task folder format, version 1](docs/format.md)                                            |
+| **Guide**    | [Add a task, step by step](docs/add-a-task.md)                                             |
 | **Example**  | [examples/hello](examples/hello), a complete made-up task                                  |
 | **Security** | [Report a vulnerability privately](https://github.com/jboho/arvio/security/advisories/new) |
 
@@ -50,6 +51,8 @@ my-task/
 The format is in [docs/format.md](docs/format.md). [examples/hello](examples/hello) is a complete made-up task.
 
 ## Use
+
+New to arvio? [Add a task](docs/add-a-task.md) walks you from a task folder to your first label in five steps, and covers the common errors.
 
 Needs macOS or Linux, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/).
 

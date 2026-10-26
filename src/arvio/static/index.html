@@ -147,6 +147,7 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .panel-head .right { margin-left: auto; font-family: var(--font-mono); font-size: var(--t-micro); color: var(--k-lo); text-transform: uppercase; letter-spacing: 0.1em; }
 .panel-body { padding: 12px 14px; display: grid; gap: 10px; }
 
+a.guide { color: var(--k-accent); text-underline-offset: 2px; }
 .facts { font-family: var(--font-mono); font-size: var(--t-mini); color: var(--k-lo); }
 .note-line { font-size: var(--t-caption); color: var(--k-warn); }
 .problem { font-size: var(--t-caption); color: var(--k-crit); }
@@ -275,6 +276,8 @@ const root = document.documentElement;
 const PACE_WINDOW = 20;
 const PACE_MIN = 3;
 
+const GUIDE = "https://github.com/jboho/arvio/blob/main/docs/add-a-task.md";
+
 // The key arrives in the link's #fragment, so it never reaches a server log.
 // It is kept for this tab only, so a reload still works.
 const TOKEN = (() => {
@@ -340,6 +343,11 @@ function foldPanel({ title, right, open }, ...body) {
 function button(text, onclick, opts = {}) {
   return h("button", { type: "button", class: "btn" + (opts.primary ? " primary" : "") + (opts.small ? " small" : ""), onclick, disabled: !!opts.disabled },
     opts.key && kbd(opts.key), text);
+}
+
+// Opens in a new tab so the session in this one is left alone.
+function guideLink(text, anchor) {
+  return h("a", { class: "guide", href: GUIDE + (anchor || ""), target: "_blank", rel: "noopener noreferrer" }, text);
 }
 
 function plural(n, one, many) { return `${n} ${n === 1 ? one : many || one + "s"}`; }
@@ -433,7 +441,8 @@ async function showInbox() {
     ? "No tasks. Add one in your terminal with: arvio add DIR"
     : active ? "Nothing is active. Your archived tasks are on the Archived tab."
       : "Nothing is archived. Archive a task to put it away; you can move it back any time.";
-  $app.replaceChildren(
+  // replaceChildren would print a skipped part as the text "false".
+  $app.replaceChildren(...[
     h("div", { class: "intro" }, h("h1", {}, active ? "Inbox" : "Archived"),
       h("p", { class: "sub" }, active
         ? `${plural(waiting, "item")} waiting in ${plural(shown.length, "task")}`
@@ -443,7 +452,9 @@ async function showInbox() {
       button(`Archived ${archivedCount}`, () => switchView("archived"), { primary: !active, small: true })),
     shown.length
       ? h("div", { class: "grid" }, shown.map(taskPanel))
-      : h("p", { class: "sub" }, empty));
+      : h("p", { class: "sub" }, empty),
+    !inbox.length && h("p", {}, guideLink("How to add a task")),
+  ].filter(Boolean));
   $app.focus({ preventScroll: true });
 }
 
@@ -475,6 +486,7 @@ function taskPanel(t, n) {
     return panel({ title: t.name },
       h("p", { class: "problem" }, t.problem),
       h("p", { class: "facts" }, t.dir),
+      h("p", {}, guideLink("What does this mean?", "#if-something-goes-wrong")),
       h("div", { class: "actions" }, h("span", { class: "grow" }), moveButton(t)));
   }
   const unrevealed = t.labeled - t.revealed;
