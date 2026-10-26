@@ -277,6 +277,13 @@ def test_inbox_lists_the_task(client, folder):
     assert (t["items"], t["waiting"], t["labeled"], t["revealed"]) == (12, 12, 0, 0)
     assert t["next_n"] == 10 and t["next_minutes"] == 5
     assert "problem" not in t
+    assert t["unfinished"] is True
+
+
+def test_inbox_flags_a_finished_task_as_not_unfinished(client, folder):
+    finish_task(folder)
+    t = client.ok("GET", "/inbox")["tasks"][0]
+    assert t["unfinished"] is False
 
 
 def test_archive_flag_round_trips_and_blocks_new_sessions(client, folder):

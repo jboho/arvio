@@ -202,6 +202,7 @@ class Task:
             "waiting": waiting,
             "labeled": len(self.labels.current),
             "revealed": len(self.labels.revealed),
+            "unfinished": self.unfinished(),
             "older": len(self.labels.older),
             "has_judge": self.card.agreement is not None,
             "last_at": self.labels.last_at,
