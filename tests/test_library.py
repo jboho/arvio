@@ -2,7 +2,7 @@ import pytest
 from conftest import read_items, write_lines
 
 from arvio import library
-from arvio.cli import main
+from arvio.cli import GUIDE_URL, main
 from arvio.store import locked, read_registry
 from arvio.task import load_task
 
@@ -67,7 +67,9 @@ def test_import_refuses_a_broken_task_and_leaves_no_copy(task_dir, data_dir, cap
     rows[0]["display"][0]["kind"] = "html"
     write_lines(task_dir / "items.jsonl", rows)
     assert main(["add", "--import", str(task_dir), "--name", "mine"]) == 1
-    assert "items.jsonl:1: error" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "items.jsonl:1: error" in err
+    assert f"guide: {GUIDE_URL}" in err
     assert not (data_dir / "tasks" / "mine").exists()
 
 
