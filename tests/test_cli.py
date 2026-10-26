@@ -1,10 +1,12 @@
 import json
+import shutil
 
 import pytest
-from conftest import read_items, write_lines
+from conftest import finish_task, read_items, write_lines
 
 from arvio import server
 from arvio.cli import main
+from arvio.store import read_registry
 from arvio.task import load_task
 
 
@@ -222,6 +224,7 @@ def test_labels_fails_closed(task_dir, capsys):
 def test_archive_and_unarchive_move_a_task_between_the_lists(
     task_dir, data_dir, capsys
 ):
+    finish_task(task_dir)
     main(["add", str(task_dir)])
     capsys.readouterr()
     assert main(["archive", str(task_dir)]) == 0
@@ -233,12 +236,33 @@ def test_archive_and_unarchive_move_a_task_between_the_lists(
     assert "No active tasks." in out and "1 archived; list them with" in out
     assert main(["status", "--archived"]) == 0
     out = capsys.readouterr().out
-    assert "waiting 12, labeled 0" in out
+    assert "waiting 0, labeled 12" in out
     assert main(["unarchive", str(task_dir)]) == 0
     assert capsys.readouterr().out.startswith("moved to active: ")
     assert main(["status"]) == 0
-    assert "waiting 12, labeled 0" in capsys.readouterr().out
+    assert "waiting 0, labeled 12" in capsys.readouterr().out
     assert (task_dir / "task.toml").is_file()
+
+
+def test_archive_refuses_a_task_that_is_not_finished(task_dir, capsys):
+    main(["add", str(task_dir)])
+    capsys.readouterr()
+    assert main(["archive", str(task_dir)]) == 1
+    assert "12 items are still waiting" in capsys.readouterr().err
+    finish_task(task_dir, reveal=False)
+    assert main(["archive", str(task_dir)]) == 1
+    assert "not locked yet" in capsys.readouterr().err
+    finish_task(task_dir)
+    assert main(["archive", str(task_dir)]) == 0
+    assert read_registry()[0]["archived"] is True
+
+
+def test_archive_allows_a_folder_that_is_gone(task_dir, capsys):
+    main(["add", str(task_dir)])
+    shutil.rmtree(task_dir)
+    capsys.readouterr()
+    assert main(["archive", str(task_dir)]) == 0
+    assert read_registry()[0]["archived"] is True
 
 
 def test_archive_refuses_a_task_that_is_not_in_the_inbox(task_dir, capsys):
@@ -249,7 +273,8 @@ def test_archive_refuses_a_task_that_is_not_in_the_inbox(task_dir, capsys):
 def test_serving_still_works_when_every_task_is_archived(task_dir, monkeypatch):
     calls = []
     monkeypatch.setattr(server, "run", lambda **kw: calls.append(kw) or 0)
+    finish_task(task_dir)
     main(["add", str(task_dir)])
-    main(["archive", str(task_dir)])
+    assert main(["archive", str(task_dir)]) == 0
     assert main(["--no-browser"]) == 0
     assert calls == [{"open_browser": False}]

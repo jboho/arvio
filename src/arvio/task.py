@@ -178,6 +178,12 @@ class Task:
     def waiting(self) -> list[Item]:
         return [i for i in self.items if i.id not in self.labels.current]
 
+    def unfinished(self) -> bool:
+        """True while items wait for a label or labels wait for the session's end."""
+        return bool(self.waiting()) or len(self.labels.current) > len(
+            self.labels.revealed
+        )
+
     def pace(self) -> float:
         """Seconds per item: the median of recent labels once there are enough."""
         recent = self.labels.seconds[-PACE_WINDOW:]

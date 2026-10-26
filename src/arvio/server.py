@@ -26,7 +26,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from arvio import store
+from arvio import library, store
 from arvio.report import outcome
 from arvio.task import (
     BLOCK_SCHEMAS,
@@ -274,6 +274,9 @@ class App:
         folder = self.folders.get(tid)
         if folder is None:
             raise ApiError(404, "no such task")
+        reason = library.unfinished_reason(folder) if archived else None
+        if reason:
+            raise ApiError(409, f"not archived: {reason}")
         try:
             found = store.set_archived(folder, archived)
         except store.StoreError as e:

@@ -170,6 +170,7 @@ kbd {
 .btn.small { padding: 3px 8px; }
 .ctrl { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--k-lo); cursor: pointer; }
 .ctrl:hover { background: var(--k-raised); color: var(--k-hi); }
+.actions.tabs { margin-bottom: 18px; }
 .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .actions .grow { flex: 1; }
 .dock { position: sticky; bottom: 0; z-index: 3; display: grid; gap: 8px; padding: 10px 0 14px; background: var(--k-stage); border-top: 1px solid var(--k-hair); }
@@ -437,7 +438,7 @@ async function showInbox() {
       h("p", { class: "sub" }, active
         ? `${plural(waiting, "item")} waiting in ${plural(shown.length, "task")}`
         : plural(shown.length, "archived task"))),
-    inbox.length > 0 && h("div", { class: "actions" },
+    inbox.length > 0 && h("div", { class: "actions tabs" },
       button(`Active ${inbox.length - archivedCount}`, () => switchView("active"), { primary: active, small: true }),
       button(`Archived ${archivedCount}`, () => switchView("archived"), { primary: !active, small: true })),
     shown.length
@@ -446,7 +447,14 @@ async function showInbox() {
   $app.focus({ preventScroll: true });
 }
 
-function visibleTasks() { return inbox.filter((t) => !!t.archived === (inboxView === "archived")); }
+function unfinished(t) { return !t.problem && (t.waiting > 0 || t.labeled > t.revealed); }
+
+// Tasks with work left come first; the sort is stable, so the registry order holds within each group.
+function visibleTasks() {
+  return inbox
+    .filter((t) => !!t.archived === (inboxView === "archived"))
+    .sort((a, b) => unfinished(b) - unfinished(a));
+}
 
 function switchView(view) { inboxView = view; showInbox(); }
 
@@ -456,10 +464,11 @@ async function setArchived(tid, archived) {
 }
 
 function moveButton(t) {
+  if (!t.archived && unfinished(t)) return null;
   return button(t.archived ? "Move to active" : "Archive", () => setArchived(t.id, !t.archived), { small: true });
 }
 
-function startable(t) { return !t.archived && !t.problem && (t.waiting > 0 || t.labeled > t.revealed); }
+function startable(t) { return !t.archived && unfinished(t); }
 
 function taskPanel(t, n) {
   if (t.problem) {
