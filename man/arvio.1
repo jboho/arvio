@@ -44,12 +44,45 @@ Print the version and exit.
 Print a short help text and exit.
 .SH COMMANDS
 .TP
-.BI "arvio add " DIR
+.B arvio add \fR[\fB\-\-import\fR [\fB\-\-name\fR \fINAME\fR]] \fIDIR\fR
 Check the task folder
 .I DIR
 and add it to your inbox.
 Nothing is added if the check finds an error.
 Adding a folder that is already in the inbox is not an error.
+.RS
+.TP
+.B \-\-import
+First copy
+.I task.toml
+and
+.I items.jsonl
+into arvio's own folder,
+.IR $ARVIO_DATA_DIR/tasks/NAME ,
+and add that copy instead of
+.IR DIR .
+Labels are then written to the copy, so they no longer depend on the project's checkout.
+The project's
+.I labels.jsonl
+is never copied.
+.IP
+Running the import again replaces the card and the items and keeps the labels.
+It is refused, and nothing changes, if the labels would then name an item that is gone, or if a page has the folder open.
+.TP
+.BI \-\-name " NAME"
+The copy's folder name, used with
+.BR \-\-import .
+The default is the name of
+.IR DIR .
+A name has 1 to 64 characters from
+.BR "a\-z 0\-9 . _ \-" ,
+and starts with a letter or digit.
+Using
+.B \-\-name
+without
+.B \-\-import
+is an error.
+.RE
 .TP
 .BI "arvio remove " DIR
 Take
@@ -58,10 +91,25 @@ off your inbox.
 The folder's files stay.
 Exits 1 if the folder was not in the inbox.
 .TP
-.B arvio status
-For each task in the inbox, print how many items are waiting and how many are labeled.
+.BI "arvio archive " NAME_OR_DIR
+Move a task to the archived list.
+.I NAME_OR_DIR
+is the path of a folder in your inbox, or the name of an imported task.
+The folder does not move, so its labels and reports stay where they are.
+A page that has the folder open is not affected.
+Exits 1 if the task is not in your inbox.
+.TP
+.BI "arvio unarchive " NAME_OR_DIR
+Move an archived task back to the active list.
+.TP
+.B arvio status \fR[\fB\-\-archived\fR]
+For each active task in the inbox, print how many items are waiting and how many are labeled.
 It also prints how many labels came from an older version of the task card, the date of the last label, and how long the next session takes.
 A task that cannot be opened is listed with its first error, and the command then exits 1.
+Archived tasks are left out and counted on the last line.
+With
+.BR \-\-archived ,
+list the archived tasks instead.
 .TP
 .BI "arvio check " DIR
 Check
@@ -140,6 +188,10 @@ or
 .BR 1 \- 9
 opens a task.
 .IP \(bu 2
+The page has an Active tab and an Archived tab.
+Each task has a button that moves it between them.
+The page cannot start a session on an archived task until you move it back.
+.IP \(bu 2
 Each label is appended to
 .I labels.jsonl
 and synced to disk when you save it.
@@ -158,10 +210,13 @@ the report was written, and the task card's gate passed or the card has none.
 .B 1
 An error.
 The task folder has an error, a file could not be read or written, the inbox cannot be read, or (for
-.BR "arvio remove" )
-the folder was not in the inbox.
+.BR "arvio remove" ,
+.BR "arvio archive"
+and
+.BR "arvio unarchive" )
+the task was not in the inbox.
 .BR "arvio status"
-also exits 1 if any task in the inbox cannot be opened.
+also exits 1 if any task it lists cannot be opened.
 .TP
 .B 2
 Only from
@@ -171,7 +226,7 @@ A script can stop on this status.
 .SH ENVIRONMENT
 .TP
 .B ARVIO_DATA_DIR
-The folder that holds the inbox.
+The folder that holds the inbox and the imported tasks.
 The default is
 .IR ~/.arvio .
 .TP
@@ -183,6 +238,14 @@ The default is your login name.
 .I $ARVIO_DATA_DIR/tasks.json
 The inbox.
 It holds the absolute paths of task folders, never items or labels.
+An archived task has
+.B "archived": true
+in its entry.
+.TP
+.I $ARVIO_DATA_DIR/tasks/NAME
+The copy of a task that
+.B "arvio add \-\-import"
+made.
 .TP
 .I $ARVIO_DATA_DIR/server.lock
 Held by the running arvio, so only one runs per inbox.
@@ -212,6 +275,16 @@ Check a task folder, add it to the inbox, and label it:
 arvio check my\-task
 arvio add my\-task
 arvio
+.fi
+.RE
+.PP
+Keep arvio's own copy of a task, so the labels outlive the project's checkout, and later put it away:
+.PP
+.RS
+.nf
+arvio add \-\-import my\-task
+arvio archive my\-task
+arvio status \-\-archived
 .fi
 .RE
 .PP

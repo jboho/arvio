@@ -362,6 +362,45 @@ also warns, without failing, when a label comes after its item's reveal (it is i
 or
 .B judge
 values.
+.SH THE INBOX
+.B "arvio add"
+checks a task folder and records its absolute path in
+.IR $ARVIO_DATA_DIR/tasks.json ,
+which is
+.I ~/.arvio/tasks.json
+by default.
+.B "arvio remove"
+takes it off.
+The task's files stay.
+The inbox holds paths only, never items or labels.
+.PP
+.B "arvio add \-\-import"
+first copies
+.I task.toml
+and
+.I items.jsonl
+into
+.IR $ARVIO_DATA_DIR/tasks/NAME ,
+and adds that copy.
+Labels are written there.
+The project's
+.I labels.jsonl
+is never copied.
+Running the import again replaces the card and the items and keeps the labels.
+It is refused, and nothing changes, if the labels would then name an item that is gone, or if a page has the folder open.
+.PP
+An inbox entry can carry
+.BR """archived"": true" .
+.B "arvio archive"
+sets it and
+.B "arvio unarchive"
+removes it.
+The folder itself never moves.
+An archived task is hidden from the page's Active tab and from
+.BR "arvio status" ,
+and it appears on the Archived tab and under
+.BR "arvio status \-\-archived" .
+The page cannot start a session on an archived task until it is moved back.
 .SH EXAMPLES
 A small card with two choices and the required
 .BR cant_tell :
