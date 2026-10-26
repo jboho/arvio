@@ -57,6 +57,8 @@ Needs macOS or Linux, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/)
 uv tool install git+https://github.com/jboho/arvio@v0.2.0
 arvio check my-task      # check a task folder; exits 1 and names the file and line on any error
 arvio add my-task        # check it and add it to your inbox
+arvio add --import my-task   # same, from a copy arvio keeps in ~/.arvio/tasks, so the labels outlive the project's checkout
+arvio archive my-task    # move that copy, labels included, to ~/.arvio/archive
 arvio                    # open the labeling page for your inbox
 arvio report my-task     # compare your labels with the judge; writes report.md and report.json
 arvio labels my-task     # print the current label per item as JSON lines, for your own scripts
@@ -70,7 +72,7 @@ The page shows one item at a time. Press a choice's key, then Enter to save; ←
 
 `arvio report` exits 2 when the task card sets a pass rule (a gate) and the labels don't meet it yet, so a script can stop on it.
 
-The inbox lives in `~/.arvio`. Set `ARVIO_DATA_DIR` to put it elsewhere, and `ARVIO_LABELER` to change the name written with each label (your login name by default).
+The inbox, the imported tasks and the archive live in `~/.arvio`. Set `ARVIO_DATA_DIR` to put it elsewhere, and `ARVIO_LABELER` to change the name written with each label (your login name by default).
 
 ## Known gaps
 

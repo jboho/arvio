@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from arvio import __version__, report, server
+from arvio import __version__, library, report, server
 from arvio.store import StoreError, read_registry, register, unregister
 from arvio.task import Problem, check_task
 
@@ -35,6 +35,11 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_add(args: argparse.Namespace) -> int:
+    if args.name and not args.import_:
+        print("arvio: --name needs --import", file=sys.stderr)
+        return 1
+    if args.import_:
+        return _import_and_add(args)
     task, problems = check_task(args.dir)
     _print_problems(problems)
     if task is None:
@@ -47,6 +52,35 @@ def cmd_add(args: argparse.Namespace) -> int:
         return 1
     state = "added" if added else "already in your inbox"
     print(f"{state}: {task.card.title} ({len(task.waiting())} waiting)")
+    return 0
+
+
+def _import_and_add(args: argparse.Namespace) -> int:
+    try:
+        task, created = library.import_task(args.dir, args.name)
+        register(task.dir)
+    except library.LibraryError as e:
+        _print_problems(e.problems)
+        print(f"arvio: {e}", file=sys.stderr)
+        return 1
+    except (StoreError, OSError) as e:
+        print(f"arvio: {e}", file=sys.stderr)
+        return 1
+    state = "imported" if created else "updated"
+    print(f"{state}: {task.card.title} ({len(task.waiting())} waiting)\n  {task.dir}")
+    return 0
+
+
+def cmd_archive(args: argparse.Namespace) -> int:
+    try:
+        target = library.archive_task(args.name)
+    except library.LibraryError as e:
+        print(f"arvio: {e}", file=sys.stderr)
+        return 1
+    except (StoreError, OSError) as e:
+        print(f"arvio: {e}", file=sys.stderr)
+        return 1
+    print(f"archived: {target}")
     return 0
 
 
@@ -148,10 +182,25 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
     p = sub.add_parser("add", help="check a task folder and add it to your inbox")
     p.add_argument("dir", type=Path, metavar="DIR")
+    p.add_argument(
+        "--import",
+        dest="import_",
+        action="store_true",
+        help="copy the card and items into arvio's own tasks folder and add that copy",
+    )
+    p.add_argument(
+        "--name", metavar="NAME", help="the copy's folder name (with --import)"
+    )
     p.set_defaults(run=cmd_add)
     p = sub.add_parser("remove", help="take a task folder off your inbox")
     p.add_argument("dir", type=Path, metavar="DIR")
     p.set_defaults(run=cmd_remove)
+    p = sub.add_parser(
+        "archive",
+        help="move a task from arvio's tasks folder to its archive, labels included",
+    )
+    p.add_argument("name", metavar="NAME")
+    p.set_defaults(run=cmd_archive)
     p = sub.add_parser("status", help="show what is waiting in your inbox")
     p.set_defaults(run=cmd_status)
     p = sub.add_parser("check", help="check a task folder; exits 1 on any error")
