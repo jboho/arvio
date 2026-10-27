@@ -35,7 +35,7 @@
 
 ## Status
 
-Experimental. The tests run on Linux in CI, on Python 3.11, 3.12 and 3.13. The page has been checked in a Chromium-based browser on macOS at desktop width, by keyboard only, in the light and dark themes. One person has used it so far, for one real labeling pass of 20 items. See [Known gaps](#known-gaps) before you rely on it.
+Experimental. The tests run on Linux in CI, on Python 3.11, 3.12 and 3.13. The page has been checked in a Chromium-based browser on macOS at desktop width, by keyboard only, in the light and dark themes. One person has used it so far, for 257 labeled items across five real tasks. See [Known gaps](#known-gaps) before you rely on it.
 
 ## How it fits a project
 
