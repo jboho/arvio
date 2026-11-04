@@ -57,7 +57,7 @@ New to arvio? [Add a task](docs/add-a-task.md) walks you from a task folder to y
 Needs macOS or Linux, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/).
 
 ```sh
-uv tool install git+https://github.com/jboho/arvio@v0.2.0
+uv tool install git+https://github.com/jboho/arvio@v0.3.0
 arvio check my-task      # check a task folder; exits 1 and names the file and line on any error
 arvio add my-task        # check it and add it to your inbox
 arvio add --import my-task   # same, from a copy arvio keeps in ~/.arvio/tasks, so the labels outlive the project's checkout
